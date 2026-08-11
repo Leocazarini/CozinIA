@@ -1,0 +1,33 @@
+# Local planning/dev docs — not part of the versioned project
+/docs
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.log
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+*.pid
