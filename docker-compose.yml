@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cozinia}
     volumes:
       - cozinia_db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cozinia} -d ${POSTGRES_DB:-cozinia}"]
       interval: 5s
@@ -35,7 +36,7 @@ services:
       start_period: 5s
     ports:
       - "8000:8000"
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
 
 volumes:
   cozinia_db_data:

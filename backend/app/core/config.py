@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://cozinia:cozinia@localhost:5432/cozinia"
+    test_database_url: str = "postgresql+asyncpg://cozinia:cozinia@localhost:5432/cozinia_test"
     openrouter_api_key: str = ""
     ai_model: str = "anthropic/claude-sonnet-5"
 
