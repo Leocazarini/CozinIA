@@ -13,10 +13,14 @@ function numberOrNull(value: string): number | null {
   return value.trim() === '' ? null : Number(value)
 }
 
-const fieldClassName =
-  'rounded-xl border border-line bg-paper px-3 py-2 text-ink placeholder:text-ink-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30'
-const labelClassName = 'text-sm font-medium text-ink-muted'
-const ghostButtonClassName = 'text-sm font-medium text-ink-muted underline decoration-line underline-offset-4 transition-colors hover:text-accent'
+const fieldClassName = 'field px-3 py-2'
+const labelClassName =
+  'font-display text-[0.68rem] font-extrabold tracking-[0.16em] text-ink-muted uppercase'
+const ghostButtonClassName =
+  'font-display text-[0.68rem] font-extrabold tracking-[0.14em] text-accent uppercase underline decoration-2 underline-offset-4 transition-colors hover:text-ink'
+const fieldsetClassName = 'tile flex flex-col gap-4 px-4 py-4'
+const legendClassName =
+  'mx-1 rounded-[2px] bg-surface px-2 font-display text-xs font-extrabold tracking-[0.2em] text-ink uppercase'
 
 /** Manual edit form for correcting whatever the AI extraction got wrong. */
 export function RecipeEditForm({
@@ -86,7 +90,7 @@ export function RecipeEditForm({
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           required
-          className={`${fieldClassName} font-display text-lg italic`}
+          className={`${fieldClassName} font-display text-lg font-extrabold tracking-[-0.02em]`}
         />
       </div>
 
@@ -157,10 +161,13 @@ export function RecipeEditForm({
         </div>
       </div>
 
-      <fieldset className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4">
-        <legend className="px-1 font-display italic text-ink">Ingredientes</legend>
+      <fieldset className={fieldsetClassName}>
+        <legend className={legendClassName}>Ingredientes</legend>
         {ingredients.map((ingredient, index) => (
-          <div key={index} className="flex flex-wrap items-end gap-2 border-b border-line pb-3 last:border-none last:pb-0">
+          <div
+            key={index}
+            className="flex flex-wrap items-end gap-2 border-b-2 border-line pb-3 last:border-none last:pb-0"
+          >
             <div className="flex flex-col gap-1.5">
               <label htmlFor={`ingredient-name-${index}`} className={labelClassName}>
                 Nome do ingrediente {index + 1}
@@ -197,7 +204,11 @@ export function RecipeEditForm({
                 className={`w-24 ${fieldClassName}`}
               />
             </div>
-            <button type="button" onClick={() => removeIngredient(index)} className={ghostButtonClassName}>
+            <button
+              type="button"
+              onClick={() => removeIngredient(index)}
+              className={`pb-2 ${ghostButtonClassName}`}
+            >
               Remover
             </button>
           </div>
@@ -207,8 +218,8 @@ export function RecipeEditForm({
         </button>
       </fieldset>
 
-      <fieldset className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4">
-        <legend className="px-1 font-display italic text-ink">Modo de preparo</legend>
+      <fieldset className={fieldsetClassName}>
+        <legend className={legendClassName}>Modo de preparo</legend>
         {steps.map((step, index) => (
           <div key={index} className="flex flex-col gap-1.5">
             <label htmlFor={`step-text-${index}`} className={labelClassName}>
@@ -222,7 +233,11 @@ export function RecipeEditForm({
                 required
                 className={`flex-1 ${fieldClassName}`}
               />
-              <button type="button" onClick={() => removeStep(index)} className={ghostButtonClassName}>
+              <button
+                type="button"
+                onClick={() => removeStep(index)}
+                className={`pt-2 ${ghostButtonClassName}`}
+              >
                 Remover
               </button>
             </div>
@@ -233,11 +248,11 @@ export function RecipeEditForm({
         </button>
       </fieldset>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-5">
         <button
           type="submit"
           disabled={isSaving}
-          className="rounded-xl bg-accent px-5 py-2.5 font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="tile tile-flat tile-pressable bg-accent px-6 py-2.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
         >
           {isSaving ? 'Salvando…' : 'Salvar'}
         </button>
@@ -247,7 +262,7 @@ export function RecipeEditForm({
       </div>
 
       {errorMessage && (
-        <p role="alert" className="text-sm text-accent">
+        <p role="alert" className="border-l-4 border-accent pl-3 text-sm font-medium text-ink">
           {errorMessage}
         </p>
       )}

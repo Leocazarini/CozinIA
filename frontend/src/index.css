@@ -1,39 +1,65 @@
 @import "tailwindcss";
-@import "@fontsource-variable/fraunces/wght.css";
-@import "@fontsource-variable/fraunces/wght-italic.css";
+@import "@fontsource-variable/bricolage-grotesque/index.css";
 @import "@fontsource-variable/karla/wght.css";
 
 /*
- * Design tokens — warm editorial cookbook feel (paper, ink, a single
- * terracotta accent) instead of a generic SaaS palette. Light values here
- * are the default; dark values below just override the same custom
- * properties, so every utility built from them (bg-paper, text-ink, ...)
- * stays correct in both themes without redefinition.
+ * Design tokens — "azulejo brasileiro". The app is a whitewashed tile wall:
+ * cobalt ink painted on glazed ceramic, urucum (annatto) as the market
+ * accent, leaf green as the secondary. Nothing here is black — every dark
+ * value is a navy, the way tile painting actually reads.
+ *
+ * Light values are the default; the dark block below overrides the same
+ * custom properties, so every utility built from them (bg-paper, text-ink,
+ * border-line, ...) stays correct in both themes without redefinition.
  */
 @theme {
-  --color-paper: #f7f1e6;
-  --color-surface: #efe6d3;
-  --color-ink: #2a2420;
-  --color-ink-muted: #6b5f52;
-  --color-accent: #c1502e;
-  --color-accent-ink: #fff8f0;
-  --color-accent-soft: #f0dcc9;
-  --color-line: #e2d6c1;
+  --color-paper: #f2efe4;
+  --color-surface: #fbf9f2;
+  --color-ink: #14294c;
+  --color-ink-muted: #5c6b87;
+  --color-accent: #dd5827;
+  --color-accent-ink: #fff6ef;
+  --color-accent-soft: #f7dcc8;
+  --color-tile: #2f5fa8;
+  --color-leaf: #2f7d5d;
+  --color-line: #d7d0bf;
 
-  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-display: "Bricolage Grotesque Variable", "Trebuchet MS", sans-serif;
   --font-sans: "Karla Variable", system-ui, sans-serif;
+}
+
+/*
+ * The tile motif: quarter-circles at the corners (they close into full
+ * circles across neighbouring tiles), a quatrefoil rosette in the middle,
+ * and lozenges split across each edge so the grid interlocks seamlessly.
+ * Painted as a *mask* rather than a coloured background image, so a single
+ * drawing picks up `--color-tile` in whichever theme is active.
+ */
+:root {
+  --azulejo-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.2'%3E%3Ccircle cx='0' cy='0' r='7.5'/%3E%3Ccircle cx='44' cy='0' r='7.5'/%3E%3Ccircle cx='0' cy='44' r='7.5'/%3E%3Ccircle cx='44' cy='44' r='7.5'/%3E%3Cpath d='M16 16 A6 6 0 0 1 28 16 A6 6 0 0 1 28 28 A6 6 0 0 1 16 28 A6 6 0 0 1 16 16 Z'/%3E%3Cpath d='M22 -3 25 0 22 3 19 0 Z'/%3E%3Cpath d='M22 41 25 44 22 47 19 44 Z'/%3E%3Cpath d='M-3 22 0 19 3 22 0 25 Z'/%3E%3Cpath d='M41 22 44 19 47 22 44 25 Z'/%3E%3C/g%3E%3Ccircle cx='22' cy='22' r='1.8' fill='%23000'/%3E%3C/svg%3E");
+  --azulejo-opacity: 0.11;
+  /* Hard stamp shadow under every tile — no blur, ever. */
+  --color-emboss: #14294c;
+  /* Ceramic sheen across the top-left of a glazed tile. */
+  --glaze: rgb(255 255 255 / 0.9);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-paper: #211b16;
-    --color-surface: #2b231d;
-    --color-ink: #f3ead9;
-    --color-ink-muted: #b8a98f;
-    --color-accent: #e37b4d;
-    --color-accent-ink: #241109;
-    --color-accent-soft: #3a2a1e;
-    --color-line: #3a3128;
+    --color-paper: #0e1a2f;
+    --color-surface: #17253f;
+    --color-ink: #eef2f9;
+    --color-ink-muted: #94a5c1;
+    --color-accent: #f5793f;
+    --color-accent-ink: #2b0f04;
+    --color-accent-soft: #3b2418;
+    --color-tile: #4d83cf;
+    --color-leaf: #4fab7f;
+    --color-line: #29395a;
+
+    --azulejo-opacity: 0.16;
+    --color-emboss: #04070f;
+    --glaze: rgb(255 255 255 / 0.05);
   }
 }
 
@@ -43,4 +69,178 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/*
+ * The tiled wall itself. Fixed rather than scrolling: the content slides
+ * over a wall that stays put, which is what makes the cards read as tiles
+ * stuck onto it instead of a patterned page background.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--color-tile);
+  opacity: var(--azulejo-opacity);
+  -webkit-mask-image: var(--azulejo-tile);
+  mask-image: var(--azulejo-tile);
+  -webkit-mask-size: 44px 44px;
+  mask-size: 44px 44px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /*
+   * A glazed tile: square-ish, hard cobalt border, hard offset stamp
+   * shadow (no blur — this is the whole aesthetic), ceramic sheen on top.
+   */
+  .tile {
+    background-color: var(--color-surface);
+    background-image: linear-gradient(155deg, var(--glaze), transparent 46%);
+    border: 2px solid var(--color-ink);
+    border-radius: 4px;
+    box-shadow: 4px 4px 0 0 var(--color-emboss);
+  }
+
+  /*
+   * Pressable version — the sticker gives under the thumb. Uses the
+   * independent `translate` property rather than `transform` so it
+   * composes with each tile's resting `rotate` instead of erasing it.
+   */
+  .tile-pressable {
+    transition:
+      translate 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .tile-pressable:hover {
+    translate: 2px 2px;
+    box-shadow: 2px 2px 0 0 var(--color-emboss);
+  }
+
+  .tile-pressable:active {
+    translate: 4px 4px;
+    box-shadow: 0 0 0 0 var(--color-emboss);
+  }
+
+  /*
+   * Accent-filled tiles drop the ceramic sheen: over a saturated colour it
+   * stops reading as glaze and turns into a plain gradient wash.
+   */
+  .tile-flat {
+    background-image: none;
+  }
+
+  /* Thin inner keyline, the way a painted tile is framed inside its edge. */
+  .tile-keyline {
+    box-shadow:
+      inset 0 0 0 1px var(--color-surface),
+      inset 0 0 0 2.5px color-mix(in srgb, var(--color-tile) 45%, transparent),
+      4px 4px 0 0 var(--color-emboss);
+  }
+
+  /* Dogtooth frieze — the painted border that closes a tile panel. */
+  .frieze {
+    height: 6px;
+    background-image:
+      linear-gradient(135deg, var(--color-tile) 25%, transparent 25%),
+      linear-gradient(225deg, var(--color-tile) 25%, transparent 25%);
+    background-size: 12px 12px;
+    background-repeat: repeat-x;
+    opacity: 0.55;
+  }
+
+  .field {
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-ink);
+    border-radius: 4px;
+    color: var(--color-ink);
+    box-shadow: 3px 3px 0 0 var(--color-emboss);
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .field::placeholder {
+    color: color-mix(in srgb, var(--color-ink-muted) 75%, transparent);
+  }
+
+  .field:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 3px 3px 0 0 var(--color-accent);
+  }
+
+  .field:disabled {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * One orchestrated entrance: tiles drop onto the wall in sequence.
+ * `backwards` (not `forwards`) so the element returns to its own CSS once
+ * the animation ends — otherwise the hover/press transforms would be
+ * frozen out by the animation's final keyframe.
+ */
+@keyframes tile-drop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tile-drop {
+  animation: tile-drop 480ms cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 65ms);
+}
+
+/* Three tiles bobbing while the recipes load. */
+@keyframes tile-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-7px);
+    opacity: 1;
+  }
+}
+
+.tile-bob {
+  animation: tile-bob 900ms ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 140ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-drop,
+  .tile-bob {
+    animation: none;
+  }
+
+  .tile-pressable {
+    transition: none;
+  }
+
+  .tile-pressable:hover,
+  .tile-pressable:active {
+    translate: none;
+  }
 }
