@@ -1,19 +1,31 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { AppShell } from '../src/components/AppShell'
 
+function renderShell(path = '/pagina') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path={path} element={<p>conteúdo da página</p>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('AppShell', () => {
+  afterEach(() => {
+    // The theme toggle writes to both — keep each test's starting theme
+    // independent of whatever the previous test left behind.
+    document.documentElement.removeAttribute('data-theme')
+    window.localStorage.clear()
+  })
+
   it('given a routed page, when rendered, then shows the CozinIA header and the page content inside the main landmark', () => {
-    render(
-      <MemoryRouter initialEntries={['/pagina']}>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/pagina" element={<p>conteúdo da página</p>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    )
+    renderShell()
 
     expect(screen.getByRole('banner')).toHaveTextContent('CozinIA')
     expect(screen.getByRole('main')).toHaveTextContent('conteúdo da página')
@@ -32,5 +44,40 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('link', { name: 'Receitas' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Adicionar' })).toBeInTheDocument()
+  })
+
+  it('given the app shell is rendered, when it loads, then it shows a button to switch to dark theme', () => {
+    renderShell()
+
+    expect(screen.getByRole('button', { name: 'Ativar tema escuro' })).toBeInTheDocument()
+  })
+
+  it('given the light theme is active, when the theme button is clicked, then it switches the page to dark theme', async () => {
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(screen.getByRole('button', { name: 'Ativar tema escuro' }))
+
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(screen.getByRole('button', { name: 'Ativar tema claro' })).toBeInTheDocument()
+  })
+
+  it('given the dark theme is active, when the theme button is clicked again, then it switches back to light theme', async () => {
+    const user = userEvent.setup()
+    renderShell()
+
+    await user.click(screen.getByRole('button', { name: 'Ativar tema escuro' }))
+    await user.click(screen.getByRole('button', { name: 'Ativar tema claro' }))
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('given the user chose dark theme before, when the app shell is rendered again, then it keeps the dark theme', () => {
+    window.localStorage.setItem('cozinia-theme', 'dark')
+
+    renderShell()
+
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(screen.getByRole('button', { name: 'Ativar tema claro' })).toBeInTheDocument()
   })
 })

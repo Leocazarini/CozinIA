@@ -44,8 +44,14 @@
   --glaze: rgb(255 255 255 / 0.9);
 }
 
+/*
+ * Dark tokens apply either because the OS prefers dark and the user hasn't
+ * overridden it (`:not([data-theme='light'])`), or because the in-app
+ * toggle set `data-theme="dark"` explicitly — which must win even when the
+ * OS itself prefers light, hence the second, unconditional block below.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-paper: #0e1a2f;
     --color-surface: #17253f;
     --color-ink: #eef2f9;
@@ -61,6 +67,23 @@
     --color-emboss: #04070f;
     --glaze: rgb(255 255 255 / 0.05);
   }
+}
+
+:root[data-theme="dark"] {
+  --color-paper: #0e1a2f;
+  --color-surface: #17253f;
+  --color-ink: #eef2f9;
+  --color-ink-muted: #94a5c1;
+  --color-accent: #f5793f;
+  --color-accent-ink: #2b0f04;
+  --color-accent-soft: #3b2418;
+  --color-tile: #4d83cf;
+  --color-leaf: #4fab7f;
+  --color-line: #29395a;
+
+  --azulejo-opacity: 0.16;
+  --color-emboss: #04070f;
+  --glaze: rgb(255 255 255 / 0.05);
 }
 
 body {

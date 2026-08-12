@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
 import { MascotPerched } from './Mascot'
+import { ThemeToggle } from './ThemeToggle'
 
 /**
  * Base layout shared by every routed screen: a persistent header, the
@@ -25,6 +26,8 @@ export function AppShell() {
               IA
             </span>
           </h1>
+
+          <ThemeToggle />
 
           {/* The mascot lies along the header's bottom rule, watching the
               recipe list. The numbers are load-bearing: the SVG renders at
