@@ -42,12 +42,12 @@ services:
     build:
       context: ./frontend
     environment:
-      # Read by the browser (not container-to-container), so it must point
-      # at the backend's host-published port, not the "backend" service name.
-      # Override to your machine's LAN IP (e.g. VITE_API_URL=http://192.168.x.x:8000)
-      # when testing from a phone on the same network — "localhost" on the
-      # phone means the phone itself, not this computer.
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # Read by the browser (not container-to-container), so it must point at
+      # the backend's host-published port, not the "backend" service name.
+      # Left empty by default on purpose: the frontend then derives the API
+      # address from the host that served the page, which is what makes the
+      # app work from a phone on the LAN without pinning an IP here.
+      VITE_API_URL: ${VITE_API_URL:-}
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/tests:/app/tests
