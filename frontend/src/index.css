@@ -230,79 +230,74 @@ body::before {
 }
 
 /*
- * The mascot. Every transform below is applied to a `<g>` inside an SVG,
- * so each needs `transform-box: fill-box` — without it a percentage
+ * The mascot. Transforms below apply to a `<g>` inside an SVG, so each
+ * needs `transform-box: fill-box` — without it a percentage
  * `transform-origin` resolves against the SVG's viewport rather than the
- * group's own box, and the pot pivots around a point off in space.
+ * group's own box, and the pose pivots around a point off in space.
  */
 
-/* Hung off the header rule, so it swings from the mitts — 6% down the
-   bounding box, which is where the grip actually is. */
-@keyframes mascot-sway {
+/*
+ * Steam travelling along its own wave: a dashed copy of the curl slides
+ * its dash pattern toward the path's start (the top), so the smoke beads
+ * follow the squiggle's exact shape as they rise. A faint solid curl
+ * underneath keeps the logo silhouette present at all times.
+ */
+@keyframes steam-flow {
+  to {
+    stroke-dashoffset: 13;
+  }
+}
+
+.steam-flow {
+  stroke-dasharray: 6 7;
+  animation: steam-flow 1.3s linear infinite;
+}
+
+/* Lower legs swinging gently behind the header line. One group, one
+   motion — legs animated separately read as flailing. */
+@keyframes legs-dangle {
   from {
-    transform: rotate(-2.6deg);
+    transform: rotate(-2.2deg);
   }
   to {
-    transform: rotate(2.6deg);
+    transform: rotate(2.2deg);
   }
 }
 
-.mascot-sway {
+.legs-dangle {
   transform-box: fill-box;
-  transform-origin: 50% 6%;
-  animation: mascot-sway 4.6s ease-in-out infinite alternate;
+  transform-origin: 50% 0%;
+  animation: legs-dangle 3.6s ease-in-out infinite alternate;
 }
 
-/* Draped over the input: a slow breath, pivoting on the mitts at the
-   bottom. Keeps it from reading as a sticker someone forgot to remove. */
-@keyframes mascot-lean {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-2.4deg);
+/* A slow breath for the resting poses — keeps them from reading as a
+   sticker someone forgot to remove. */
+@keyframes mascot-breathe {
+  from {
+    transform: translateY(0);
   }
-  50% {
-    transform: translateY(-2.5px) rotate(-0.6deg);
+  to {
+    transform: translateY(-1.6px);
   }
 }
 
-.mascot-lean {
+.mascot-breathe {
   transform-box: fill-box;
-  transform-origin: 50% 89%;
-  animation: mascot-lean 5.2s ease-in-out infinite;
-  /* `translate`, not `transform` — the animation owns `transform`, and the
-     two properties compose instead of overwriting each other. */
-  transition: translate 220ms ease;
+  animation: mascot-breathe 4.4s ease-in-out infinite alternate;
 }
 
-/* The pot pushes itself up to see what is being pasted. Pure CSS off the
-   input's own focus state, so no React state has to track it. */
-.field-nest:has(.field:focus) .mascot-lean {
-  translate: 0 -4px;
-  animation-duration: 2.6s;
+/* The lounging pot perks up when the URL field takes focus. Pure CSS off
+   the input's own state; `translate` composes with the breathing group's
+   `transform` instead of overwriting it. */
+.mascot-lift {
+  transition: translate 240ms ease;
 }
 
-/* Steam actually leaving the pot while the recipe is extracted. */
-@keyframes steam-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(7px) scaleY(0.65);
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-15px) scaleY(1.2);
-  }
+.field-nest:has(.field:focus) .mascot-lift {
+  translate: 0 -3px;
 }
 
-.steam-rise {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: steam-rise 2.6s ease-out infinite;
-  animation-delay: calc(var(--i, 0) * 520ms);
-}
-
+/* Bubbles knocking against the inside of the pot while it cooks. */
 @keyframes bubble-up {
   0%,
   100% {
@@ -358,26 +353,26 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .tile-drop,
   .tile-bob,
-  .mascot-sway,
-  .mascot-lean,
-  .steam-rise,
+  .legs-dangle,
+  .mascot-breathe,
+  .steam-flow,
   .bubble-up,
   .rail-pulse,
   .caption-fade {
     animation: none;
   }
 
-  /* The steam curls only exist as motion — without it they should still
-     read as steam, so pin them at full opacity rather than mid-fade. */
-  .steam-rise {
-    opacity: 1;
+  /* Without motion the dashed overlay must not sit frozen mid-crawl:
+     un-dash it so the two layers merge into the logo's solid curl. */
+  .steam-flow {
+    stroke-dasharray: none;
   }
 
-  .mascot-lean {
+  .mascot-lift {
     transition: none;
   }
 
-  .field-nest:has(.field:focus) .mascot-lean {
+  .field-nest:has(.field:focus) .mascot-lift {
     translate: none;
   }
 

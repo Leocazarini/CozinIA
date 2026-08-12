@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, type FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CookingLoader } from '../components/CookingLoader'
-import { MascotLeaning } from '../components/Mascot'
+import { MascotLounging } from '../components/Mascot'
 import { Quatrefoil } from '../components/icons'
 import { createRecipe } from '../api/recipes'
 
@@ -63,9 +63,10 @@ export function AddRecipe() {
         className="tile-drop flex flex-col gap-5"
         style={{ '--i': 1 } as CSSProperties}
       >
-        {/* The top margin is the mascot's room: it is anchored to the field's
-            top edge and reaches ~85px above it. Without this it would climb
-            over the paragraph. */}
+        {/* The top margin is the mascot's room: lounging on the field's top
+            edge it reaches ~80px above it, and the label row only accounts
+            for part of that. Without this it would climb over the
+            paragraph. */}
         <div className="mt-16 flex flex-col gap-2">
           <label
             htmlFor="recipe-url"
@@ -76,11 +77,6 @@ export function AddRecipe() {
           {/* `field-nest` is the hook the stylesheet uses to perk the mascot
               up while the input has focus — see index.css. */}
           <div className="field-nest relative">
-            {/* Hidden while the pot is busy cooking downstairs in the
-                loader: two of the same mascot on screen breaks the gag. */}
-            {!mutation.isPending && (
-              <MascotLeaning className="pointer-events-none absolute right-1 bottom-full z-10 w-[104px] translate-y-[16px]" />
-            )}
             <input
               id="recipe-url"
               type="url"
@@ -91,6 +87,17 @@ export function AddRecipe() {
               disabled={mutation.isPending}
               className="field w-full px-4 py-3"
             />
+            {/* After the input in the DOM so it paints over the field's top
+                border — it is lying *on* the edge, not tucked behind it.
+                Hidden while the pot is busy cooking downstairs in the
+                loader: two of the same mascot on screen breaks the gag.
+                The negative margin (not translate-y: the `translate`
+                property belongs to the focus lift) drops the artwork's
+                below-line overhang past the border so the body settles
+                onto it. */}
+            {!mutation.isPending && (
+              <MascotLounging className="mascot-lift pointer-events-none absolute right-0 bottom-full z-10 mb-[-10px] w-[190px]" />
+            )}
           </div>
         </div>
         <button
