@@ -51,6 +51,15 @@ export function MoonIcon({ className }: IconProps) {
   )
 }
 
+export function SearchIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M19.5 19.5l-4.35-4.35" />
+    </svg>
+  )
+}
+
 /**
  * The four-petal rosette at the centre of the azulejo tile, reused as a
  * standalone ornament to close panels and mark empty states.
