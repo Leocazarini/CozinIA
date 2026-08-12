@@ -38,11 +38,31 @@ services:
       - "8000:8000"
     command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
 
+  frontend:
+    build:
+      context: ./frontend
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/tests:/app/tests
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/public:/app/public
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "5173:5173"
+
   # Smoke test of the whole system: waits for the backend to be healthy
   # (proving boot + migrations + DB connectivity already work), then runs
   # the full backend suite against the real test database, reports the
   # result, and exits — it never stays up.
-  tests:
+  tests-backend:
     build:
       context: ./backend
     environment:
@@ -54,6 +74,17 @@ services:
       backend:
         condition: service_healthy
     command: ["pytest", "-v"]
+    restart: "no"
+
+  # Same idea as tests-backend, but for the frontend suite (Vitest) — waits
+  # for the frontend dev server to be healthy, runs it once, reports and exits.
+  tests-frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      frontend:
+        condition: service_healthy
+    command: ["npm", "run", "test:run"]
     restart: "no"
 
 volumes:
