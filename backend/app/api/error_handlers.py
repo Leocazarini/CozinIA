@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.services.ai_extractor import AIRequestError, MalformedAIResponseError
+from app.services.ai_extractor import AIRequestError, MalformedAIResponseError, NotARecipeError
 from app.services.scraper import NoExtractableContentError, UnreachableUrlError
 
 _ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
@@ -24,6 +24,11 @@ _ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
     NoExtractableContentError: (
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "Não encontramos uma receita no conteúdo dessa página.",
+    ),
+    NotARecipeError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Esse link não parece ser de uma receita — não encontramos ingredientes "
+        "nem modo de preparo na página.",
     ),
     AIRequestError: (
         status.HTTP_503_SERVICE_UNAVAILABLE,

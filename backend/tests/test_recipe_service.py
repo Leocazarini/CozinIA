@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.recipe import IngredientExtraction, RecipeExtraction, StepExtraction
-from app.services.ai_extractor import AIRequestError
+from app.services.ai_extractor import AIRequestError, NotARecipeError
 from app.services.recipe_service import RecipeService
 from app.services.scraper import UnreachableUrlError
 
@@ -82,3 +82,20 @@ async def test_given_the_ai_request_fails_when_creating_a_recipe_then_the_error_
 
     with pytest.raises(AIRequestError):
         await service.create_from_url("https://example.com/receita")
+
+
+async def test_given_the_source_is_not_a_recipe_when_creating_a_recipe_then_the_error_propagates(
+    db_session: AsyncSession,
+) -> None:
+    """Given the AI determines the source text isn't a recipe, when
+    creating a recipe, then NotARecipeError propagates unchanged and
+    nothing is persisted — the API layer is responsible for translating it
+    into a user-facing response."""
+
+    async def not_a_recipe_extract(text: str) -> RecipeExtraction:
+        raise NotARecipeError("a página não tem ingredientes nem modo de preparo")
+
+    service = RecipeService(db_session, scrape=_stub_scrape, extract=not_a_recipe_extract)
+
+    with pytest.raises(NotARecipeError):
+        await service.create_from_url("https://example.com/nao-e-receita")
