@@ -46,6 +46,12 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'Adicionar' })).toBeInTheDocument()
   })
 
+  it('given the app shell is rendered on any page, when it loads, then the CozinIA wordmark links to the home route', () => {
+    renderShell('/adicionar')
+
+    expect(screen.getByRole('link', { name: 'CozinIA' })).toHaveAttribute('href', '/')
+  })
+
   it('given the app shell is rendered, when it loads, then it shows a button to switch to dark theme', () => {
     renderShell()
 

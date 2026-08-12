@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
 import { MascotPerched } from './Mascot'
 import { ThemeToggle } from './ThemeToggle'
@@ -19,13 +19,16 @@ export function AppShell() {
       <header className="sticky top-0 z-10 border-b-2 border-ink bg-paper/90 backdrop-blur">
         <div className="relative mx-auto flex max-w-md items-center px-5 py-3.5">
           {/* "IA" is set as its own accent tile: the intelligence is the
-              product, so the wordmark says so out loud. */}
-          <h1 className="flex items-center font-display text-[1.7rem] font-extrabold leading-none tracking-[-0.035em]">
-            <span>Cozin</span>
-            <span className="ml-1.5 -rotate-3 rounded-[3px] border-2 border-ink bg-accent px-1.5 pt-1 pb-0.5 text-accent-ink shadow-[3px_3px_0_0_var(--color-emboss)]">
-              IA
-            </span>
-          </h1>
+              product, so the wordmark says so out loud. The whole mark is
+              also the way home from anywhere in the app. */}
+          <Link to="/" className="flex items-center">
+            <h1 className="flex items-center font-display text-[1.7rem] font-extrabold leading-none tracking-[-0.035em]">
+              <span>Cozin</span>
+              <span className="ml-1.5 -rotate-3 rounded-[3px] border-2 border-ink bg-accent px-1.5 pt-1 pb-0.5 text-accent-ink shadow-[3px_3px_0_0_var(--color-emboss)]">
+                IA
+              </span>
+            </h1>
+          </Link>
 
           <ThemeToggle />
 
