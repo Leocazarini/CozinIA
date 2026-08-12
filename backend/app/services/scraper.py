@@ -4,7 +4,7 @@ import httpx
 import trafilatura
 
 _REQUEST_TIMEOUT_SECONDS = 15.0
-_USER_AGENT = "Mozilla/5.0 (compatible; CoziniaBot/1.0)"
+_USER_AGENT = "Mozilla/5.0 (compatible; CozinIABot/1.0)"
 
 # trafilatura falls back to whatever text it can find (e.g. a single nav
 # link) when a page has no clear main content, instead of returning nothing.

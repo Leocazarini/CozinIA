@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime configuration for the Cozinia backend."""
+    """Runtime configuration for the CozinIA backend."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
