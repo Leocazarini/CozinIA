@@ -18,8 +18,8 @@ export default defineConfig({
         short_name: 'Cozinia',
         description: 'Salve receitas a partir de um link e organize tudo em um só lugar.',
         lang: 'pt-BR',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#c1502e',
+        background_color: '#f7f1e6',
         display: 'standalone',
         start_url: '/',
         icons: [
