@@ -229,10 +229,151 @@ body::before {
   animation-delay: calc(var(--i, 0) * 140ms);
 }
 
+/*
+ * The mascot. Transforms below apply to a `<g>` inside an SVG, so each
+ * needs `transform-box: fill-box` — without it a percentage
+ * `transform-origin` resolves against the SVG's viewport rather than the
+ * group's own box, and the pose pivots around a point off in space.
+ */
+
+/*
+ * Steam travelling along its own wave: a dashed copy of the curl slides
+ * its dash pattern toward the path's start (the top), so the smoke beads
+ * follow the squiggle's exact shape as they rise. A faint solid curl
+ * underneath keeps the logo silhouette present at all times.
+ */
+@keyframes steam-flow {
+  to {
+    stroke-dashoffset: 13;
+  }
+}
+
+.steam-flow {
+  stroke-dasharray: 6 7;
+  animation: steam-flow 1.3s linear infinite;
+}
+
+/* Lower legs swinging gently behind the header line. One group, one
+   motion — legs animated separately read as flailing. */
+@keyframes legs-dangle {
+  from {
+    transform: rotate(-2.2deg);
+  }
+  to {
+    transform: rotate(2.2deg);
+  }
+}
+
+.legs-dangle {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: legs-dangle 3.6s ease-in-out infinite alternate;
+}
+
+/* A slow breath for the resting poses — keeps them from reading as a
+   sticker someone forgot to remove. */
+@keyframes mascot-breathe {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-1.6px);
+  }
+}
+
+.mascot-breathe {
+  transform-box: fill-box;
+  animation: mascot-breathe 4.4s ease-in-out infinite alternate;
+}
+
+/* The lounging pot perks up when the URL field takes focus. Pure CSS off
+   the input's own state; `translate` composes with the breathing group's
+   `transform` instead of overwriting it. */
+.mascot-lift {
+  transition: translate 240ms ease;
+}
+
+.field-nest:has(.field:focus) .mascot-lift {
+  translate: 0 -3px;
+}
+
+/* Bubbles knocking against the inside of the pot while it cooks. */
+@keyframes bubble-up {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.7;
+  }
+}
+
+.bubble-up {
+  transform-box: fill-box;
+  animation: bubble-up 1.9s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 280ms);
+}
+
+/* Indeterminate rail: tiles lighting along a row, no fake percentage. */
+@keyframes rail-pulse {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rail-pulse {
+  animation: rail-pulse 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 130ms);
+}
+
+/* Each loader caption arrives on its own instead of swapping mid-sentence. */
+@keyframes caption-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.caption-fade {
+  animation: caption-fade 320ms ease-out backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tile-drop,
-  .tile-bob {
+  .tile-bob,
+  .legs-dangle,
+  .mascot-breathe,
+  .steam-flow,
+  .bubble-up,
+  .rail-pulse,
+  .caption-fade {
     animation: none;
+  }
+
+  /* Without motion the dashed overlay must not sit frozen mid-crawl:
+     un-dash it so the two layers merge into the logo's solid curl. */
+  .steam-flow {
+    stroke-dasharray: none;
+  }
+
+  .mascot-lift {
+    transition: none;
+  }
+
+  .field-nest:has(.field:focus) .mascot-lift {
+    translate: none;
   }
 
   .tile-pressable {

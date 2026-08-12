@@ -24,6 +24,11 @@ function tileStyle(index: number): CSSProperties {
   } as CSSProperties
 }
 
+/*
+ * The mascot for this screen lives in the AppShell header (it lounges on
+ * the header's own rule); its boots reach ~20px below the frieze, which
+ * `main`'s py-7 already clears — no extra spacing needed here.
+ */
 export function Home() {
   const { data, isPending, isError } = useQuery({
     queryKey: ['recipes'],
