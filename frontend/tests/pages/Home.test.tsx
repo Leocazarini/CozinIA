@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { API_BASE_URL } from '../../src/api/config'
 import { Home } from '../../src/pages/Home'
@@ -13,7 +14,9 @@ function renderHome() {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <Home />
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -33,6 +36,19 @@ describe('Home', () => {
 
     expect(await screen.findByText('Bolo de cenoura')).toBeInTheDocument()
     expect(screen.getByText('Feijoada')).toBeInTheDocument()
+  })
+
+  it('given the API has saved recipes, when Home renders, then each title links to its detail page', async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/recipes`, () =>
+        HttpResponse.json([buildRecipe({ id: '1', title: 'Bolo de cenoura' })]),
+      ),
+    )
+
+    renderHome()
+
+    const link = await screen.findByRole('link', { name: 'Bolo de cenoura' })
+    expect(link).toHaveAttribute('href', '/recipes/1')
   })
 
   it('given the API has no saved recipes, when Home renders, then it shows the empty-state message in Portuguese', async () => {

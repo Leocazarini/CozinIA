@@ -33,3 +33,17 @@ export interface Recipe {
   created_at: string
   updated_at: string
 }
+
+/** Partial edit payload for PATCH /api/recipes/{id} — mirrors UpdateRecipeRequest. */
+export interface UpdateRecipeInput {
+  title?: string
+  description?: string | null
+  image_url?: string | null
+  prep_time_minutes?: number | null
+  cook_time_minutes?: number | null
+  total_time_minutes?: number | null
+  servings?: number | null
+  ingredients?: Ingredient[]
+  steps?: Step[]
+  tags?: string[] | null
+}

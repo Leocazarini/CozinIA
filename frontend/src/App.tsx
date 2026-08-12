@@ -4,6 +4,7 @@ import { queryClient } from './api/queryClient'
 import { AppShell } from './components/AppShell'
 import { AddRecipe } from './pages/AddRecipe'
 import { Home } from './pages/Home'
+import { RecipeDetail } from './pages/RecipeDetail'
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<Home />} />
             <Route path="/adicionar" element={<AddRecipe />} />
+            <Route path="/recipes/:id" element={<RecipeDetail />} />
           </Route>
         </Routes>
       </BrowserRouter>

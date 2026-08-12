@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './config'
-import type { Recipe } from './types'
+import type { Recipe, UpdateRecipeInput } from './types'
 
 /** An error whose message already comes translated for the end user. */
 export class ApiError extends Error {}
@@ -12,11 +12,31 @@ export async function fetchRecipes(): Promise<Recipe[]> {
   return response.json() as Promise<Recipe[]>
 }
 
+export async function fetchRecipe(id: string): Promise<Recipe> {
+  const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`)
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response))
+  }
+  return response.json() as Promise<Recipe>
+}
+
 export async function createRecipe(url: string): Promise<Recipe> {
   const response = await fetch(`${API_BASE_URL}/api/recipes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
+  })
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response))
+  }
+  return response.json() as Promise<Recipe>
+}
+
+export async function updateRecipe(id: string, changes: UpdateRecipeInput): Promise<Recipe> {
+  const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
   })
   if (!response.ok) {
     throw new ApiError(await extractErrorMessage(response))
