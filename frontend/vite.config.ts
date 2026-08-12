@@ -14,12 +14,12 @@ export default defineConfig({
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         // User-facing metadata — kept in Portuguese on purpose.
-        name: 'Cozinia',
-        short_name: 'Cozinia',
+        name: 'CozinIA',
+        short_name: 'CozinIA',
         description: 'Salve receitas a partir de um link e organize tudo em um só lugar.',
         lang: 'pt-BR',
-        theme_color: '#c1502e',
-        background_color: '#f7f1e6',
+        theme_color: '#f2efe4',
+        background_color: '#f2efe4',
         display: 'standalone',
         start_url: '/',
         icons: [

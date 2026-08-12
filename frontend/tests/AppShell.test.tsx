@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { AppShell } from '../src/components/AppShell'
 
 describe('AppShell', () => {
-  it('given a routed page, when rendered, then shows the Cozinia header and the page content inside the main landmark', () => {
+  it('given a routed page, when rendered, then shows the CozinIA header and the page content inside the main landmark', () => {
     render(
       <MemoryRouter initialEntries={['/pagina']}>
         <Routes>
@@ -15,7 +15,7 @@ describe('AppShell', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('banner')).toHaveTextContent('Cozinia')
+    expect(screen.getByRole('banner')).toHaveTextContent('CozinIA')
     expect(screen.getByRole('main')).toHaveTextContent('conteúdo da página')
   })
 
