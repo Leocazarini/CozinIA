@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CSSProperties, type FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CookingLoader } from '../components/CookingLoader'
+import { MascotLeaning } from '../components/Mascot'
 import { Quatrefoil } from '../components/icons'
 import { createRecipe } from '../api/recipes'
 
@@ -44,39 +46,52 @@ export function AddRecipe() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div
-        className="tile tile-drop flex items-start gap-3 px-4 py-4"
-        style={{ '--i': 0 } as CSSProperties}
-      >
-        <Quatrefoil className="mt-0.5 h-5 w-5 shrink-0 text-tile" />
+      <div className="tile-drop flex flex-col gap-2" style={{ '--i': 0 } as CSSProperties}>
+        <h2 className="font-display text-[1.9rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-ink">
+          O que vamos <span className="text-accent">cozinhar</span> hoje?
+        </h2>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Cole o link e a <span className="font-bold text-accent">IA</span> lê a página por você:
-          ingredientes, modo de preparo, tempos e porções.
+          Cole o link e deixa comigo. Eu leio a página inteira — inclusive a parte
+          sobre a viagem da autora à Toscana — e trago só o que interessa.
         </p>
       </div>
+
+      {mutation.isPending && <CookingLoader />}
 
       <form
         onSubmit={handleSubmit}
         className="tile-drop flex flex-col gap-5"
         style={{ '--i': 1 } as CSSProperties}
       >
-        <div className="flex flex-col gap-2">
+        {/* The top margin is the mascot's room: it is anchored to the field's
+            top edge and reaches ~85px above it. Without this it would climb
+            over the paragraph. */}
+        <div className="mt-16 flex flex-col gap-2">
           <label
             htmlFor="recipe-url"
             className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
           >
             Link da receita
           </label>
-          <input
-            id="recipe-url"
-            type="url"
-            required
-            placeholder="https://..."
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            disabled={mutation.isPending}
-            className="field px-4 py-3"
-          />
+          {/* `field-nest` is the hook the stylesheet uses to perk the mascot
+              up while the input has focus — see index.css. */}
+          <div className="field-nest relative">
+            {/* Hidden while the pot is busy cooking downstairs in the
+                loader: two of the same mascot on screen breaks the gag. */}
+            {!mutation.isPending && (
+              <MascotLeaning className="pointer-events-none absolute right-1 bottom-full z-10 w-[104px] translate-y-[16px]" />
+            )}
+            <input
+              id="recipe-url"
+              type="url"
+              required
+              placeholder="https://… pode ser aquele blog gigante"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              disabled={mutation.isPending}
+              className="field w-full px-4 py-3"
+            />
+          </div>
         </div>
         <button
           type="submit"

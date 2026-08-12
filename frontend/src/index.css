@@ -229,10 +229,156 @@ body::before {
   animation-delay: calc(var(--i, 0) * 140ms);
 }
 
+/*
+ * The mascot. Every transform below is applied to a `<g>` inside an SVG,
+ * so each needs `transform-box: fill-box` — without it a percentage
+ * `transform-origin` resolves against the SVG's viewport rather than the
+ * group's own box, and the pot pivots around a point off in space.
+ */
+
+/* Hung off the header rule, so it swings from the mitts — 6% down the
+   bounding box, which is where the grip actually is. */
+@keyframes mascot-sway {
+  from {
+    transform: rotate(-2.6deg);
+  }
+  to {
+    transform: rotate(2.6deg);
+  }
+}
+
+.mascot-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 6%;
+  animation: mascot-sway 4.6s ease-in-out infinite alternate;
+}
+
+/* Draped over the input: a slow breath, pivoting on the mitts at the
+   bottom. Keeps it from reading as a sticker someone forgot to remove. */
+@keyframes mascot-lean {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2.4deg);
+  }
+  50% {
+    transform: translateY(-2.5px) rotate(-0.6deg);
+  }
+}
+
+.mascot-lean {
+  transform-box: fill-box;
+  transform-origin: 50% 89%;
+  animation: mascot-lean 5.2s ease-in-out infinite;
+  /* `translate`, not `transform` — the animation owns `transform`, and the
+     two properties compose instead of overwriting each other. */
+  transition: translate 220ms ease;
+}
+
+/* The pot pushes itself up to see what is being pasted. Pure CSS off the
+   input's own focus state, so no React state has to track it. */
+.field-nest:has(.field:focus) .mascot-lean {
+  translate: 0 -4px;
+  animation-duration: 2.6s;
+}
+
+/* Steam actually leaving the pot while the recipe is extracted. */
+@keyframes steam-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scaleY(0.65);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15px) scaleY(1.2);
+  }
+}
+
+.steam-rise {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: steam-rise 2.6s ease-out infinite;
+  animation-delay: calc(var(--i, 0) * 520ms);
+}
+
+@keyframes bubble-up {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.7;
+  }
+}
+
+.bubble-up {
+  transform-box: fill-box;
+  animation: bubble-up 1.9s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 280ms);
+}
+
+/* Indeterminate rail: tiles lighting along a row, no fake percentage. */
+@keyframes rail-pulse {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rail-pulse {
+  animation: rail-pulse 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 130ms);
+}
+
+/* Each loader caption arrives on its own instead of swapping mid-sentence. */
+@keyframes caption-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.caption-fade {
+  animation: caption-fade 320ms ease-out backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tile-drop,
-  .tile-bob {
+  .tile-bob,
+  .mascot-sway,
+  .mascot-lean,
+  .steam-rise,
+  .bubble-up,
+  .rail-pulse,
+  .caption-fade {
     animation: none;
+  }
+
+  /* The steam curls only exist as motion — without it they should still
+     read as steam, so pin them at full opacity rather than mid-fade. */
+  .steam-rise {
+    opacity: 1;
+  }
+
+  .mascot-lean {
+    transition: none;
+  }
+
+  .field-nest:has(.field:focus) .mascot-lean {
+    translate: none;
   }
 
   .tile-pressable {
