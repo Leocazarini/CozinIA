@@ -22,7 +22,7 @@ from app.core.db import get_db_session
 from app.main import app
 from app.models.recipe import Recipe
 from app.schemas.recipe import IngredientExtraction, RecipeExtraction, StepExtraction
-from app.services.ai_extractor import AIRequestError
+from app.services.ai_extractor import AIRequestError, NotARecipeError
 from app.services.recipe_service import RecipeService
 from app.services.scraper import UnreachableUrlError
 
@@ -233,3 +233,44 @@ def test_given_the_ai_provider_is_unavailable_when_posting_then_returns_a_portug
     assert response.json()["detail"] == (
         "O serviço de extração por IA está indisponível no momento. Tente novamente em instantes."
     )
+
+
+def test_given_the_source_is_not_a_recipe_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the AI determines the source page isn't a recipe (no
+    ingredients or preparation steps), when POSTed to /api/recipes, then a
+    422 with a Portuguese, user-facing message is returned and nothing is
+    persisted."""
+
+    async def not_a_recipe_extract(text: str) -> RecipeExtraction:
+        raise NotARecipeError("a página é uma listagem de categorias")
+
+    client = make_client(extract=not_a_recipe_extract)
+
+    response = client.post("/api/recipes", json={"url": "https://example.com/nao-e-receita"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Esse link não parece ser de uma receita — não encontramos ingredientes "
+        "nem modo de preparo na página."
+    )
+
+    listed = client.get("/api/recipes").json()
+    assert listed == []
+
+
+def test_given_a_persisted_recipe_when_updated_with_empty_ingredients_then_returns_a_validation_error(
+    client: TestClient,
+) -> None:
+    """Given a recipe was created, when PATCHed with an empty ingredients
+    list, then the request is rejected — a manual edit can't leave a
+    recipe with no ingredients any more than the AI extraction can."""
+    created = client.post("/api/recipes", json={"url": "https://example.com/receita"}).json()
+
+    response = client.patch(f"/api/recipes/{created['id']}", json={"ingredients": []})
+
+    assert response.status_code == 422
+
+    unchanged = client.get(f"/api/recipes/{created['id']}").json()
+    assert unchanged["ingredients"] == created["ingredients"]

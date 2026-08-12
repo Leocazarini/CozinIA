@@ -28,18 +28,46 @@ class StepExtraction(BaseModel):
 
 
 class RecipeExtraction(BaseModel):
-    """Structured recipe data extracted from a source page's text by the AI."""
+    """Structured recipe data extracted from a source page's text by the AI.
 
-    title: str
+    Title, ingredients and steps are required to be non-empty: a page with
+    none of those isn't a recipe, and the app must never store one that
+    looks like it is but has nothing in it (see RecipeExtractionOutcome,
+    which is how the AI is expected to signal "this isn't a recipe" instead
+    of producing an empty one of these).
+    """
+
+    title: str = Field(min_length=1)
     description: str | None = None
     image_url: str | None = None
     prep_time_minutes: int | None = None
     cook_time_minutes: int | None = None
     total_time_minutes: int | None = None
     servings: int | None = None
-    ingredients: list[IngredientExtraction]
-    steps: list[StepExtraction]
+    ingredients: list[IngredientExtraction] = Field(min_length=1)
+    steps: list[StepExtraction] = Field(min_length=1)
     tags: list[str] | None = None
+
+
+class RecipeExtractionOutcome(BaseModel):
+    """The AI's full response to a recipe-extraction request.
+
+    Wraps RecipeExtraction with an explicit self-assessment so the model
+    has a correct way to represent "the given text isn't a recipe" (no
+    identifiable ingredients or preparation steps) instead of being forced
+    to either invent content or produce an empty RecipeExtraction that
+    can't be persisted anyway.
+    """
+
+    is_recipe: bool
+    reason: str | None = Field(
+        default=None,
+        description="Brief reason when is_recipe is false, e.g. 'this is a category "
+        "listing page, not a recipe'.",
+    )
+    recipe: RecipeExtraction | None = Field(
+        default=None, description="The extracted recipe. Present only when is_recipe is true."
+    )
 
 
 class CreateRecipeRequest(BaseModel):
@@ -78,13 +106,13 @@ class UpdateRecipeRequest(BaseModel):
     are applied (see the `exclude_unset` usage in the route handler).
     """
 
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1)
     description: str | None = None
     image_url: str | None = None
     prep_time_minutes: int | None = None
     cook_time_minutes: int | None = None
     total_time_minutes: int | None = None
     servings: int | None = None
-    ingredients: list[IngredientExtraction] | None = None
-    steps: list[StepExtraction] | None = None
+    ingredients: list[IngredientExtraction] | None = Field(default=None, min_length=1)
+    steps: list[StepExtraction] | None = Field(default=None, min_length=1)
     tags: list[str] | None = None

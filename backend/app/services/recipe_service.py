@@ -36,9 +36,10 @@ class RecipeService:
         """Fetch the page at `source_url`, extract its recipe via AI, and
         persist the result.
 
-        Lets UnreachableUrlError, NoExtractableContentError, AIRequestError
-        and MalformedAIResponseError propagate unchanged — the API layer is
-        responsible for translating them into user-facing responses.
+        Lets UnreachableUrlError, NoExtractableContentError, AIRequestError,
+        MalformedAIResponseError and NotARecipeError propagate unchanged —
+        the API layer is responsible for translating them into user-facing
+        responses.
         """
         text = await self._scrape(source_url)
         extraction = await self._extract(text)
