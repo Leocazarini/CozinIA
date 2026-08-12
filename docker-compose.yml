@@ -2,14 +2,14 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-cozinia}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cozinia}
-      POSTGRES_DB: ${POSTGRES_DB:-cozinia}
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no .env — sem valor padrão por segurança}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env — sem valor padrão por segurança}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no .env}
     volumes:
       - cozinia_db_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cozinia} -d ${POSTGRES_DB:-cozinia}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?} -d ${POSTGRES_DB:?}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,7 +20,7 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cozinia}:${POSTGRES_PASSWORD:-cozinia}@db:5432/${POSTGRES_DB:-cozinia}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
     volumes:
@@ -46,8 +46,8 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cozinia}:${POSTGRES_PASSWORD:-cozinia}@db:5432/${POSTGRES_DB:-cozinia}
-      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cozinia}:${POSTGRES_PASSWORD:-cozinia}@db:5432/cozinia_test
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
+      TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/cozinia_test
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
     depends_on:

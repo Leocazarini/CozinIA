@@ -10,8 +10,13 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://cozinia:cozinia@localhost:5432/cozinia"
-    test_database_url: str = "postgresql+asyncpg://cozinia:cozinia@localhost:5432/cozinia_test"
+    # No default credentials on purpose: a missing DATABASE_URL must fail
+    # app startup loudly, never fall back to a known username/password.
+    database_url: str
+    # Only ever read by the test suite (never by the running app) — optional
+    # here so the app itself doesn't need it to start; the test suite fails
+    # clearly on its own if it's actually missing when tests run.
+    test_database_url: str | None = None
     openrouter_api_key: str = ""
     ai_model: str = "anthropic/claude-sonnet-5"
 
