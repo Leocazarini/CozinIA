@@ -1,7 +1,14 @@
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './api/queryClient'
 import { AppShell } from './components/AppShell'
+import { Home } from './pages/Home'
 
-// Screens are wired into the main content region in later layers
-// (camada 7 onward — see docs/ROADMAP.md).
 export function App() {
-  return <AppShell>{null}</AppShell>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppShell>
+        <Home />
+      </AppShell>
+    </QueryClientProvider>
+  )
 }

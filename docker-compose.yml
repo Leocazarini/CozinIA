@@ -41,6 +41,10 @@ services:
   frontend:
     build:
       context: ./frontend
+    environment:
+      # Read by the browser (not container-to-container), so it must point
+      # at the backend's host-published port, not the "backend" service name.
+      VITE_API_URL: http://localhost:8000
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/tests:/app/tests
