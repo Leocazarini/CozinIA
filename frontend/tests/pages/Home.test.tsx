@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -80,5 +81,55 @@ describe('Home', () => {
     renderHome()
 
     expect(screen.getByText('Carregando receitas…')).toBeInTheDocument()
+  })
+
+  it('given the API has saved recipes, when the user types a matching search term, then only recipes whose title matches stay listed', async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/recipes`, () =>
+        HttpResponse.json([
+          buildRecipe({ id: '1', title: 'Bolo de cenoura' }),
+          buildRecipe({ id: '2', title: 'Feijoada' }),
+        ]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderHome()
+    await screen.findByText('Bolo de cenoura')
+
+    await user.type(screen.getByLabelText('Pesquisar receitas'), 'cenoura')
+
+    expect(screen.getByText('Bolo de cenoura')).toBeInTheDocument()
+    expect(screen.queryByText('Feijoada')).not.toBeInTheDocument()
+  })
+
+  it('given a search term, when it matches a title regardless of letter case, then the recipe stays listed', async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/recipes`, () =>
+        HttpResponse.json([buildRecipe({ id: '1', title: 'Bolo de cenoura' })]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderHome()
+    await screen.findByText('Bolo de cenoura')
+
+    await user.type(screen.getByLabelText('Pesquisar receitas'), 'BOLO')
+
+    expect(screen.getByText('Bolo de cenoura')).toBeInTheDocument()
+  })
+
+  it('given a search term that matches no title, when typed, then it shows a message that no recipe matched instead of the list', async () => {
+    server.use(
+      http.get(`${API_BASE_URL}/api/recipes`, () =>
+        HttpResponse.json([buildRecipe({ id: '1', title: 'Bolo de cenoura' })]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderHome()
+    await screen.findByText('Bolo de cenoura')
+
+    await user.type(screen.getByLabelText('Pesquisar receitas'), 'lasanha')
+
+    expect(screen.queryByText('Bolo de cenoura')).not.toBeInTheDocument()
+    expect(screen.getByText('Nenhuma receita encontrada para "lasanha".')).toBeInTheDocument()
   })
 })

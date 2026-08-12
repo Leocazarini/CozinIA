@@ -34,6 +34,32 @@ export function PlusIcon({ className }: IconProps) {
   )
 }
 
+export function SunIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2.5v2.3M12 19.2v2.3M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.3M19.2 12h2.3M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" />
+    </svg>
+  )
+}
+
+export function MoonIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <path d="M19.5 14.5a8 8 0 1 1-9-11 6.3 6.3 0 0 0 9 9Z" />
+    </svg>
+  )
+}
+
+export function SearchIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M19.5 19.5l-4.35-4.35" />
+    </svg>
+  )
+}
+
 /**
  * The four-petal rosette at the centre of the azulejo tile, reused as a
  * standalone ornament to close panels and mark empty states.

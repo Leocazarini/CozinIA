@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Quatrefoil } from '../components/icons'
+import { Quatrefoil, SearchIcon } from '../components/icons'
 import { fetchRecipes } from '../api/recipes'
 
 function timeSummary(minutes: number | null): string | null {
@@ -30,6 +30,7 @@ function tileStyle(index: number): CSSProperties {
  * `main`'s py-7 already clears — no extra spacing needed here.
  */
 export function Home() {
+  const [search, setSearch] = useState('')
   const { data, isPending, isError } = useQuery({
     queryKey: ['recipes'],
     queryFn: fetchRecipes,
@@ -78,6 +79,12 @@ export function Home() {
     )
   }
 
+  // Client-side only — the whole library is already in cache, so filtering
+  // it locally is instant and needs no round trip to the backend.
+  const query = search.trim().toLowerCase()
+  const visibleRecipes =
+    query === '' ? data : data.filter((recipe) => recipe.title.toLowerCase().includes(query))
+
   return (
     <section className="flex flex-col gap-5">
       <div className="flex items-baseline justify-between border-b-2 border-ink pb-2">
@@ -89,43 +96,64 @@ export function Home() {
         </span>
       </div>
 
-      <ul className="flex flex-col gap-4">
-        {data.map((recipe, index) => {
-          const facts = [
-            recipe.servings !== null ? `${recipe.servings} porções` : null,
-            timeSummary(recipe.total_time_minutes),
-          ].filter((fact): fact is string => fact !== null)
+      <div className="relative">
+        <label htmlFor="recipe-search" className="sr-only">
+          Pesquisar receitas
+        </label>
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+        <input
+          id="recipe-search"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Buscar por título…"
+          className="field w-full py-2.5 pr-4 pl-9 text-sm"
+        />
+      </div>
 
-          return (
-            <li key={recipe.id}>
-              <Link
-                to={`/recipes/${recipe.id}`}
-                style={tileStyle(index)}
-                className="tile tile-pressable tile-drop flex items-center gap-4 px-4 py-4"
-              >
-                {/* Decorative only — keeps the link's accessible name equal
-                    to the recipe title, which the tests pin down. */}
-                <span
-                  aria-hidden="true"
-                  className="shrink-0 font-display text-2xl font-extrabold tabular-nums text-accent"
+      {visibleRecipes.length === 0 ? (
+        <p className="pt-4 text-center text-sm text-ink-muted">
+          Nenhuma receita encontrada para &quot;{search.trim()}&quot;.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {visibleRecipes.map((recipe, index) => {
+            const facts = [
+              recipe.servings !== null ? `${recipe.servings} porções` : null,
+              timeSummary(recipe.total_time_minutes),
+            ].filter((fact): fact is string => fact !== null)
+
+            return (
+              <li key={recipe.id}>
+                <Link
+                  to={`/recipes/${recipe.id}`}
+                  style={tileStyle(index)}
+                  className="tile tile-pressable tile-drop flex items-center gap-4 px-4 py-4"
                 >
-                  {(index + 1).toString().padStart(2, '0')}
-                </span>
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="font-display text-lg leading-tight font-bold tracking-tight text-ink">
-                    {recipe.title}
+                  {/* Decorative only — keeps the link's accessible name equal
+                      to the recipe title, which the tests pin down. */}
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 font-display text-2xl font-extrabold tabular-nums text-accent"
+                  >
+                    {(index + 1).toString().padStart(2, '0')}
                   </span>
-                  {facts.length > 0 && (
-                    <span className="text-xs font-medium uppercase tracking-[0.1em] text-ink-muted">
-                      {facts.join(' · ')}
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="font-display text-lg leading-tight font-bold tracking-tight text-ink">
+                      {recipe.title}
                     </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
+                    {facts.length > 0 && (
+                      <span className="text-xs font-medium uppercase tracking-[0.1em] text-ink-muted">
+                        {facts.join(' · ')}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }
