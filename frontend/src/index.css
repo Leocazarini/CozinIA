@@ -276,6 +276,23 @@ body::before {
   animation: steam-flow 1.3s linear infinite;
 }
 
+/* The hanging body swinging from the line it holds on to. Slower than the
+   legs below it, so the two compose instead of marching in step. */
+@keyframes body-swing {
+  from {
+    transform: rotate(-2.6deg);
+  }
+  to {
+    transform: rotate(2.6deg);
+  }
+}
+
+.body-swing {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: body-swing 4.6s ease-in-out infinite alternate;
+}
+
 /* Lower legs swinging gently behind the header line. One group, one
    motion — legs animated separately read as flailing. */
 @keyframes legs-dangle {
@@ -318,6 +335,66 @@ body::before {
 
 .field-nest:has(.field:focus) .mascot-lift {
   translate: 0 -3px;
+}
+
+/*
+ * The Imagem door's flash: dark most of the cycle, one hard pop, one
+ * frame of afterglow. With motion off the burst simply stays lit — the
+ * rays are how the drawing says "camera", so they must never sit invisible.
+ */
+@keyframes flash-pop {
+  0%,
+  82%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  86% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  93% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
+.flash-pop {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: flash-pop 4.4s ease-out infinite;
+}
+
+/* The tally light on the tripod camera: recording, therefore blinking. */
+@keyframes rec-blink {
+  0%,
+  42% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0.18;
+  }
+}
+
+.rec-blink {
+  animation: rec-blink 1.7s ease-in-out infinite;
+}
+
+/* The stirring arm, pivoting at the shoulder so the spoon sweeps the pot. */
+@keyframes stir {
+  from {
+    transform: rotate(-5.5deg);
+  }
+  to {
+    transform: rotate(5.5deg);
+  }
+}
+
+.stir {
+  transform-box: fill-box;
+  transform-origin: 91% 8%;
+  animation: stir 1.5s ease-in-out infinite alternate;
 }
 
 /* Bubbles knocking against the inside of the pot while it cooks. */
@@ -376,12 +453,16 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .tile-drop,
   .tile-bob,
+  .body-swing,
   .legs-dangle,
   .mascot-breathe,
   .steam-flow,
   .bubble-up,
   .rail-pulse,
-  .caption-fade {
+  .caption-fade,
+  .flash-pop,
+  .rec-blink,
+  .stir {
     animation: none;
   }
 

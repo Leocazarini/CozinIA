@@ -51,6 +51,39 @@ export function MoonIcon({ className }: IconProps) {
   )
 }
 
+/**
+ * The three doors into a recipe, as tab marks. Drawn from the same chunky
+ * strokes as the nav icons so the tab strip reads as painted, not imported:
+ * a boxy camera with a bellows-era hump, a camcorder pointing right (the
+ * same silhouette the mascot's tripod carries), and a chain link.
+ */
+export function CameraIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <path d="M5.5 8.4h2.6l1.5-2.3h4.8l1.5 2.3h2.6A1.5 1.5 0 0 1 20 9.9v7.6a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5V9.9a1.5 1.5 0 0 1 1.5-1.5Z" />
+      <circle cx="12" cy="13.4" r="3.4" />
+    </svg>
+  )
+}
+
+export function VideoIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <rect x="2.6" y="6.8" width="12.8" height="10.4" rx="2" />
+      <path d="M21.4 8.4 15.4 12l6 3.6V8.4Z" />
+    </svg>
+  )
+}
+
+export function LinkIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <path d="M10.2 13.2a4.2 4.2 0 0 0 6.1.3l2.6-2.6a4.2 4.2 0 0 0-5.9-5.9l-1.5 1.5" />
+      <path d="M13.8 10.8a4.2 4.2 0 0 0-6.1-.3l-2.6 2.6a4.2 4.2 0 0 0 5.9 5.9l1.5-1.5" />
+    </svg>
+  )
+}
+
 export function SearchIcon({ className }: IconProps) {
   return (
     <svg className={className} {...sharedProps}>

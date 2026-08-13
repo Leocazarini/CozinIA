@@ -33,13 +33,22 @@ const stroked = { ...inked, fill: 'none' }
 
 /**
  * An arm or leg: one fat cobalt stroke with a thinner ceramic stroke laid
- * over it, yielding an outlined tube from a single path.
+ * over it, yielding an outlined tube from a single path. `width` exists for
+ * the objects built from that same tube at a thinner gauge — tripod legs, a
+ * spoon handle.
  */
-function Limb({ d }: { d: string }) {
+function Limb({ d, width = 9.6 }: { d: string; width?: number }) {
   return (
     <>
-      <path d={d} fill="none" stroke={TILE} strokeWidth="9.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke={SURFACE} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={TILE} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={SURFACE}
+        strokeWidth={width * 0.42}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </>
   )
 }
@@ -211,54 +220,50 @@ function Ticks({ x, y, flip = 1 }: { x: number; y: number; flip?: number }) {
 }
 
 /**
- * Pose one — Home. Lying belly-down along the header's bottom rule like a
- * kid on a wall: forearm folded on the line, head hanging over the edge
- * tilted down at the recipe list, hips curving over the "beam" with the
- * apron bow on the back, and the lower legs dangling on the far side.
+ * Pose one — Home. Hanging off the header's bottom rule: both forearms
+ * hooked over the line, the pot resting on it and tipped down at the
+ * recipe list, and the whole body swinging underneath with the legs
+ * kicking — someone who slipped and has not fallen yet.
  *
  * The behind-the-line illusion is a transparent window in the artwork:
  * nothing is drawn between y=0 and y=9.5, and the page positions the SVG
  * so the header's real 2px border and 6px frieze show through exactly
- * there — the legs resume below it, visibly "behind" the line. That is
- * also why this pose must stay compact above the line: the header is only
- * ~58px tall, and anything taller would poke out of the viewport.
+ * there. The neck and both shoulders live in that gap, which is what lets
+ * the body read as hanging *from* the line rather than being glued to it.
+ * That is also why the head has to stay compact above it: the header is
+ * only ~58px tall, and anything taller would poke out of the viewport.
  */
-export function MascotPerched({ className }: MascotProps) {
+export function MascotDangling({ className }: MascotProps) {
   return (
-    <svg className={className} viewBox="0 -66 140 99" fill="none" aria-hidden="true" focusable="false">
-      <g className="legs-dangle">
-        <Limb d="M100 9.5 C99 15 97.5 20 95.5 24.5" />
-        <Boot x={91} y={26} />
-        <Limb d="M111 9.5 C111.5 14 112 18 113 21.5" />
-        <Boot x={116} y={23} rotate={8} flip />
-        <Flour spots={[[98, 17, 1.1]]} />
+    <svg className={className} viewBox="0 -54 120 131" fill="none" aria-hidden="true" focusable="false">
+      {/* Everything below the line swings from where it hangs. */}
+      <g className="body-swing">
+        {/* Widest at the hem instead of tapering to shoulders the way the
+            standing torso does: the shoulders are behind the rule, so what
+            hangs below the line is the apron, its straps running up and
+            vanishing into the gap. Tapered here, it would read as a sack
+            on a hook. */}
+        <path d="M41 10C39 24 38 38 37 49Q37 54 41 54L79 54Q83 54 83 49C82 38 81 24 79 10Z" {...inked} />
+        <path d="M47 10L48.5 24M73 10L71.5 24" {...stroked} />
+        <path d="M48 30L72 30L72 39Q72 42 69 42L51 42Q48 42 48 39Z" {...inked} />
+        <Flour spots={[[43, 26, 1.5], [76, 35, 1.2], [60, 47, 1.1], [75, 18, 1]]} />
+        {/* One leg kicking out, one drawn up — the difference is what says
+            the fall is being fought rather than accepted. */}
+        <g className="legs-dangle">
+          <Limb d="M52 51C49 58 47 64 46 69" />
+          <Boot x={44} y={71} />
+          <Limb d="M68 51C73 56 75 61 72 65" />
+          <Boot x={70} y={67} rotate={22} flip />
+        </g>
       </g>
 
-      <g className="mascot-breathe">
-        {/* Back and hip, resting on the line. */}
-        <path
-          d="M58 -22 C74 -26 90 -24 99 -17 C105 -12 106.5 -6 104.5 -1.5 L58 -1.5 C54 -8 54 -16 58 -22 Z"
-          {...inked}
-        />
-        {/* Apron strap across the back, tied in a bow at the hip. */}
-        <path d="M64 -21.5 C74 -24.5 85 -23.6 93 -20.4" fill="none" stroke={TILE} strokeWidth="2" strokeLinecap="round" />
-        <path d="M95 -20.5 C91 -26 85.5 -24 88.5 -19.6 C90 -17.6 92.8 -18.2 95 -20.5 Z" {...inked} />
-        <path d="M95 -20.5 C99 -26 104.5 -24 101.5 -19.6 C100 -17.6 97.2 -18.2 95 -20.5 Z" {...inked} />
-        <path
-          d="M93.5 -19 C92.5 -15 91 -12 88.5 -10 M97 -19 C97.5 -15 98.5 -12 100.5 -9.5"
-          fill="none"
-          stroke={TILE}
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <Flour spots={[[72, -14, 1.5], [88, -9, 1.2], [63, -7, 1]]} />
+      {/* Forearms first so the pot covers where they meet the shoulders. */}
+      <Limb d="M52 -3C42 -8 32 -8 24 -5" />
+      <FlatHand x={23} y={-2} rotate={7} />
+      <Limb d="M68 -3C78 -8 88 -8 96 -5" />
+      <FlatHand x={97} y={-2} rotate={-7} flip />
 
-        {/* The elbow-prop: forearm folded flat along the line. */}
-        <Limb d="M56 -4.5 C48 -5.5 40 -5.5 31 -4.8" />
-        <FlatHand x={28.5} y={-1.2} />
-
-        <PotHead cx={48} lidY={-47.3} tilt={-15} shortSteam />
-      </g>
+      <PotHead cx={60} lidY={-36} tilt={-10} shortSteam />
     </svg>
   )
 }
@@ -309,10 +314,14 @@ export function MascotLounging({ className }: MascotProps) {
   )
 }
 
-/** Shoulders down to the apron hem — used by the cooking pose. */
-function Body({ s, hem }: { s: number; hem: number }) {
+/**
+ * Shoulders down to the apron hem. Authored around x=60 — the axis the pot
+ * head sits on in the cooking pose — and shifted by `cx` for poses that
+ * stand somewhere else on the line.
+ */
+function Body({ s, hem, cx = 60 }: { s: number; hem: number; cx?: number }) {
   return (
-    <>
+    <g transform={cx === 60 ? undefined : `translate(${cx - 60} 0)`}>
       <path
         d={`M53 ${s}C45 ${s + 2} 39 ${s + 9} 37 ${s + 19}L36 ${hem - 5}Q36 ${hem} 41 ${hem}L79 ${hem}Q84 ${hem} 84 ${hem - 5}L83 ${s + 19}C81 ${s + 9} 75 ${s + 2} 67 ${s}Z`}
         {...inked}
@@ -322,7 +331,7 @@ function Body({ s, hem }: { s: number; hem: number }) {
         d={`M46 ${hem - 24}L74 ${hem - 24}L74 ${hem - 15}Q74 ${hem - 12} 71 ${hem - 12}L49 ${hem - 12}Q46 ${hem - 12} 46 ${hem - 15}Z`}
         {...inked}
       />
-    </>
+    </g>
   )
 }
 
@@ -358,6 +367,183 @@ export function MascotCooking({ className }: MascotProps) {
       </PotHead>
       <Ticks x={16} y={30} flip={-1} />
       <Ticks x={104} y={34} />
+    </svg>
+  )
+}
+
+/**
+ * The standing legs shared by the two upright poses: knees soft, feet
+ * splayed, soles landing a hair below y=0 so the boots sit *on* the ruled
+ * line rather than hovering over it. `cx` is the figure's axis.
+ */
+function StandingLegs({ cx, hem }: { cx: number; hem: number }) {
+  return (
+    <>
+      <Limb d={`M${cx - 8} ${hem - 2}C${cx - 9} ${hem + 6} ${cx - 11} ${hem + 13} ${cx - 12} ${hem + 19}`} />
+      <Boot x={cx - 14} y={-4} />
+      <Limb d={`M${cx + 8} ${hem - 2}C${cx + 9} ${hem + 6} ${cx + 11} ${hem + 13} ${cx + 12} ${hem + 19}`} />
+      <Boot x={cx + 14} y={-4} flip />
+    </>
+  )
+}
+
+/**
+ * The camera from the era when you had to hold it against your face: body,
+ * viewfinder hump, wind knob, and a bulb flash out on its bracket. The
+ * shutter sits dead centre of the body, where a real one does. Its right
+ * edge presses into the bowl — the mascot has no eye to raise it to, so the
+ * pot's open face is where it goes. Authored around its own centre so the
+ * caller can aim the whole thing with one rotation.
+ */
+function VintageCamera({ x, y, angle }: { x: number; y: number; angle: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${angle})`}>
+      {/* Bulb flash on its bracket, and the burst it throws. */}
+      <path d="M-15 -7h-9v-4" {...stroked} strokeWidth="2.4" />
+      <circle cx="-24" cy="-15" r="4.8" {...inked} />
+      <g className="flash-pop" stroke="var(--color-accent)" strokeWidth="2.8" strokeLinecap="round">
+        {[-180, -142, -100, -55, 152].map((degrees) => {
+          const radians = (degrees * Math.PI) / 180
+          return (
+            <path
+              key={degrees}
+              d={`M${-24 + Math.cos(radians) * 8.5} ${-15 + Math.sin(radians) * 8.5}l${Math.cos(radians) * 6.5} ${Math.sin(radians) * 6.5}`}
+            />
+          )
+        })}
+      </g>
+
+      <rect x="-15" y="-11" width="30" height="22" rx="3" {...inked} />
+      <rect x="-4" y="-16.5" width="13" height="6" rx="2" {...inked} />
+      <circle cx="10" cy="-14" r="3" {...inked} />
+      {/* Dead centre of the body, where a shutter actually sits. */}
+      <circle cx="0" cy="0" r="7.6" {...inked} />
+      <circle cx="0" cy="0" r="3.6" fill={TILE} opacity="0.45" />
+      <circle cx="-2.4" cy="-1.6" r="1.4" fill={SURFACE} />
+    </g>
+  )
+}
+
+/**
+ * The crew: a movie camera with two film reels on a tripod, its lens
+ * pointing right at whoever is cooking. The tally light blinks, because a
+ * camera that is not recording is just furniture.
+ */
+function FilmRig({ cx }: { cx: number }) {
+  return (
+    <g>
+      <Limb width={7} d={`M${cx} -54C${cx - 13} -38 ${cx - 26} -16 ${cx - 32} -1`} />
+      <Limb width={7} d={`M${cx} -54C${cx + 13} -38 ${cx + 26} -16 ${cx + 32} -1`} />
+      <Limb width={5.6} d={`M${cx} -54C${cx + 2} -38 ${cx + 4} -20 ${cx + 5} -9`} />
+      <path d={`M${cx - 17} -26h34`} {...stroked} strokeWidth="2.4" />
+
+      {/* Tipped a few degrees toward the pot: the camera is framing a shot,
+          not sitting in a shop window. */}
+      <g transform={`rotate(5 ${cx} -54)`}>
+        <circle cx={cx - 12} cy={-96} r="10" {...inked} />
+        <circle cx={cx - 12} cy={-96} r="2.6" fill={TILE} />
+        <circle cx={cx + 13} cy={-96} r="10" {...inked} />
+        <circle cx={cx + 13} cy={-96} r="2.6" fill={TILE} />
+
+        <rect x={cx - 26} y={-88} width="52" height="32" rx="3.5" {...inked} />
+        {/* Lens barrel and hood, aimed at the cook. */}
+        <rect x={cx + 24} y={-79} width="11" height="14" rx="2" {...inked} />
+        <circle cx={cx + 41} cy={-72} r="7.2" {...inked} />
+        <circle cx={cx + 41} cy={-72} r="3.2" fill={TILE} opacity="0.45" />
+        {/* Crank on the far side, and the tally light. */}
+        <circle cx={cx - 30} cy={-72} r="3.4" {...inked} />
+        <path d={`M${cx - 30} -72l-6 -5`} {...stroked} strokeWidth="2.6" />
+        <circle className="rec-blink" cx={cx + 17} cy={-82} r="3.4" fill="var(--color-accent)" />
+      </g>
+    </g>
+  )
+}
+
+/**
+ * A pot standing on the line, distinct from the one the mascot wears: a
+ * belly that tapers to its base, a rolled rim, two ears, and the same steam
+ * curls the logo uses.
+ */
+function StovePot({ cx }: { cx: number }) {
+  return (
+    <g>
+      <Steam cx={cx} lidY={-36} short />
+      <path d={`M${cx - 20} -30c-8 0-8 11 0 11`} {...stroked} strokeWidth="3" />
+      <path d={`M${cx + 20} -30c8 0 8 11 0 11`} {...stroked} strokeWidth="3" />
+      <path
+        d={`M${cx - 24} -30L${cx - 18} -3Q${cx - 17} 0 ${cx - 14} 0L${cx + 14} 0Q${cx + 17} 0 ${cx + 18} -3L${cx + 24} -30Z`}
+        {...inked}
+      />
+      <rect x={cx - 28} y={-36} width="56" height="7" rx="3.5" {...inked} />
+    </g>
+  )
+}
+
+/**
+ * Pose four — the Imagem door. Standing on the field's top edge, leaning
+ * into the shot, an old camera held up against the bowl and the flash going
+ * off down into the field. The pot *is* the head, so pressing the camera
+ * against its open face is this mascot's version of raising it to the eye.
+ */
+export function MascotSnapping({ className }: MascotProps) {
+  return (
+    <svg className={className} viewBox="4 -124 100 132" fill="none" aria-hidden="true" focusable="false">
+      <StandingLegs cx={62} hem={-26} />
+      <g className="mascot-breathe">
+        {/* The lean into the shot, pivoting at the hips. */}
+        <g transform="rotate(-5 62 -26)">
+          <Body s={-74} hem={-26} cx={62} />
+          <Flour spots={[[46, -38, 1.5], [78, -33, 1.2], [68, -49, 1.1]]} />
+          {/* Head first, then the camera over its left edge: the bowl keeps
+              two thirds of its silhouette, which is the one thing that has
+              to survive at this size. */}
+          <PotHead cx={62} lidY={-102} tilt={-9} shortSteam />
+          {/* Far arm hangs; the near one reaches up under the lens barrel
+              and cradles it. Two arms on the camera read as one thick blob
+              at the size this is actually drawn at. */}
+          <Limb d="M74 -62C83 -58 85 -49 82 -42" />
+          <FlatHand x={84} y={-39} rotate={-76} scale={0.88} />
+          <VintageCamera x={48} y={-82} angle={-14} />
+          <Limb d="M50 -62C42 -63 34 -65 29 -68" />
+          <FlatHand x={30} y={-66} rotate={-52} flip scale={0.84} />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
+/**
+ * Pose five — the Vídeo door. A whole little set standing on the field's
+ * top edge: the mascot stirring a pot on the counter while a movie camera
+ * on a tripod films the take from the left.
+ */
+export function MascotFilming({ className }: MascotProps) {
+  return (
+    <svg className={className} viewBox="0 -124 216 132" fill="none" aria-hidden="true" focusable="false">
+      <FilmRig cx={52} />
+
+      <StandingLegs cx={162} hem={-26} />
+      <g className="mascot-breathe">
+        {/* Leaning over the pot, which is what stirring actually looks like. */}
+        <g transform="rotate(-5 162 -26)">
+          <Body s={-74} hem={-26} cx={162} />
+          <Flour spots={[[146, -38, 1.5], [178, -33, 1.2], [168, -49, 1.1]]} />
+          {/* Far arm hanging at the side. */}
+          <Limb d="M176 -63C187 -58 189 -48 186 -40" />
+          <FlatHand x={188} y={-37} rotate={-78} scale={0.9} />
+          <PotHead cx={162} lidY={-102} tilt={9} shortSteam />
+          {/* Stirring arm, and the spoon it drives into the pot — the
+              handle stands well clear of the rim so the gesture is legible
+              even though everything below the rim is hidden. */}
+          <g className="stir">
+            <Limb d="M150 -62C144 -58 138 -55 133 -53" />
+            <Limb width={5.4} d="M136 -62L108 -26" />
+            <FlatHand x={133} y={-53} rotate={-52} scale={0.9} />
+          </g>
+        </g>
+      </g>
+
+      <StovePot cx={118} />
     </svg>
   )
 }

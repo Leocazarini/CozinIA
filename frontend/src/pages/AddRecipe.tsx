@@ -3,36 +3,162 @@ import {
   type CSSProperties,
   type ChangeEvent,
   type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { Link } from 'react-router-dom'
 import { CookingLoader } from '../components/CookingLoader'
-import { MascotLounging } from '../components/Mascot'
-import { Quatrefoil } from '../components/icons'
+import { MascotFilming, MascotLounging, MascotSnapping } from '../components/Mascot'
+import { CameraIcon, LinkIcon, Quatrefoil, VideoIcon } from '../components/icons'
 import { createRecipe, createRecipeFromImages, createRecipeFromVideo } from '../api/recipes'
 
 /**
- * A recipe can arrive as a link, as photos, or as a video link, and the three
- * are one flow with three doors: same mutation, same loader, same success
- * screen, and the saved recipe is indistinguishable in the list afterwards.
+ * A recipe can arrive as photos, as a video link, or as a link, and the
+ * three are one flow with three doors: same mutation, same loader, same
+ * success screen, and the saved recipe is indistinguishable in the list
+ * afterwards.
  *
- * A video gets a field of its own rather than being detected from the link
+ * A video gets a door of its own rather than being detected from the link
  * field: reading a Reel as a page and reading it as a video are different
- * things, and which one the user wants is not something to guess from a host.
+ * things, and which one the user wants is not something to guess from a
+ * host.
  */
 type Submission =
   | { kind: 'link'; url: string }
   | { kind: 'photos'; files: File[] }
   | { kind: 'video'; url: string }
 
+type Door = Submission['kind']
+
+/**
+ * Photos first: the door that has no other home. A link can be pasted
+ * anywhere, but a recipe on paper only exists here.
+ */
+const DOORS = [
+  { id: 'photos', label: 'Imagem', Icon: CameraIcon },
+  { id: 'video', label: 'Vídeo', Icon: VideoIcon },
+  { id: 'link', label: 'Link', Icon: LinkIcon },
+] as const satisfies readonly { id: Door; label: string; Icon: typeof CameraIcon }[]
+
+/**
+ * Hand-stuck, not machine-laid: each tab leans a hair. The lean belongs to
+ * the position, not to the selection, so opening another door never makes
+ * the strip twitch.
+ */
+const LEANS = ['-0.7deg', '0.5deg', '-0.4deg']
+
 /** Mirrors MAX_IMAGES in backend/app/services/image_intake.py. */
 const MAX_PHOTOS = 8
 
 const ACCEPTED_PHOTO_TYPES = 'image/jpeg,image/png,image/webp'
 
+const BUTTON_CLASS =
+  'tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55'
+
+const LABEL_CLASS = 'font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase'
+
+/**
+ * The tab strip, right under the header. Three glazed tiles: the open one
+ * is filled with urucum and stamped onto the wall, the closed ones are
+ * unglazed outlines. The lozenge hanging off the open tile is the same
+ * shape the azulejo grid splits across its edges, pointing at the panel it
+ * belongs to.
+ */
+function DoorTabs({ open, onOpen }: { open: Door; onOpen: (door: Door) => void }) {
+  const tabs = useRef(new Map<Door, HTMLButtonElement>())
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const steps: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
+    const step = steps[event.key]
+    if (step === undefined) return
+    event.preventDefault()
+    const current = DOORS.findIndex((door) => door.id === open)
+    const next = DOORS[(current + step + DOORS.length) % DOORS.length].id
+    onOpen(next)
+    tabs.current.get(next)?.focus()
+  }
+
+  return (
+    <div
+      role="tablist"
+      aria-label="De onde vem a receita"
+      className="tile-drop flex gap-2"
+      style={{ '--i': 0 } as CSSProperties}
+    >
+      {DOORS.map(({ id, label, Icon }, index) => {
+        const isOpen = id === open
+        return (
+          <button
+            key={id}
+            ref={(node) => {
+              if (node) tabs.current.set(id, node)
+            }}
+            type="button"
+            role="tab"
+            id={`door-${id}`}
+            aria-selected={isOpen}
+            aria-controls={`panel-${id}`}
+            tabIndex={isOpen ? 0 : -1}
+            onClick={() => onOpen(id)}
+            onKeyDown={handleKeyDown}
+            style={{ rotate: LEANS[index] }}
+            className={[
+              'relative flex flex-1 items-center justify-center gap-1.5 rounded-[4px] border-2 py-2.5 font-display text-[0.7rem] font-extrabold tracking-[0.12em] uppercase transition-colors duration-150',
+              isOpen
+                ? 'tile tile-flat tile-pressable border-ink bg-accent text-accent-ink'
+                : 'border-ink/25 bg-surface/55 text-ink-muted hover:border-ink hover:text-ink',
+            ].join(' ')}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {isOpen && (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-[7px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-2 border-ink bg-accent"
+              />
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * A field with a mascot standing on its top edge. The pose comes last in
+ * the DOM so it paints over the field's real border — it is standing *on*
+ * the line, not tucked behind it — and `room` is the space above the field
+ * the pose needs, so it never climbs over the copy. `field-nest` is the
+ * hook the stylesheet uses to perk the pose up while the input has focus
+ * (see index.css).
+ *
+ * With no pose (an extraction is running, and the mascot is downstairs in
+ * the loader), the room goes away with it: reserving a mascot's worth of
+ * empty wall for nobody just leaves a hole in the page.
+ */
+function MascotStage({
+  children,
+  room,
+  pose,
+}: {
+  children: ReactNode
+  room: string
+  pose: ReactNode
+}) {
+  return (
+    <div className={`field-nest relative ${pose ? room : ''}`}>
+      {children}
+      {pose}
+    </div>
+  )
+}
+
 export function AddRecipe() {
+  const [open, setOpen] = useState<Door>('photos')
   const [url, setUrl] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
@@ -57,6 +183,14 @@ export function AddRecipe() {
   // Cleanup runs before the next effect and on unmount, so each batch of
   // object URLs is released as soon as it stops being the current one.
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
+
+  function handleOpen(door: Door) {
+    setOpen(door)
+    // An error belongs to the door it happened in — carrying it to the next
+    // one would blame the wrong field. A request already in flight keeps its
+    // loader, though: it is still running whichever door is on screen.
+    if (!mutation.isPending) mutation.reset()
+  }
 
   function handleSubmitUrl(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -113,204 +247,205 @@ export function AddRecipe() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="tile-drop flex flex-col gap-2" style={{ '--i': 0 } as CSSProperties}>
-        <h2 className="font-display text-[1.9rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-ink">
-          O que vamos <span className="text-accent">cozinhar</span> hoje?
-        </h2>
-        <p className="text-sm leading-relaxed text-ink-muted">
-          Cole o link e deixa comigo. Eu leio a página inteira — inclusive a parte
-          sobre a viagem da autora à Toscana — e trago só o que interessa. Se a
-          receita está num livro ou num caderno, me manda a foto. Se está num
-          vídeo, manda o link que eu escuto.
-        </p>
-      </div>
+      <DoorTabs open={open} onOpen={handleOpen} />
 
-      {mutation.isPending && <CookingLoader source={mutation.variables?.kind ?? 'link'} />}
-
-      <form
-        onSubmit={handleSubmitUrl}
-        className="tile-drop flex flex-col gap-5"
-        style={{ '--i': 1 } as CSSProperties}
-      >
-        {/* The top margin is the mascot's room: lounging on the field's top
-            edge it reaches ~80px above it, and the label row only accounts
-            for part of that. Without this it would climb over the
-            paragraph. */}
-        <div className="mt-16 flex flex-col gap-2">
-          <label
-            htmlFor="recipe-url"
-            className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
-          >
-            Link da receita
-          </label>
-          {/* `field-nest` is the hook the stylesheet uses to perk the mascot
-              up while the input has focus — see index.css. */}
-          <div className="field-nest relative">
-            <input
-              id="recipe-url"
-              type="url"
-              required
-              placeholder="https://… pode ser aquele blog gigante"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              disabled={mutation.isPending}
-              className="field w-full px-4 py-3"
-            />
-            {/* After the input in the DOM so it paints over the field's top
-                border — it is lying *on* the edge, not tucked behind it.
-                Hidden while the pot is busy cooking downstairs in the
-                loader: two of the same mascot on screen breaks the gag.
-                The negative margin (not translate-y: the `translate`
-                property belongs to the focus lift) drops the artwork's
-                below-line overhang past the border so the body settles
-                onto it. */}
-            {!mutation.isPending && (
-              <MascotLounging className="mascot-lift pointer-events-none absolute right-0 bottom-full z-10 mb-[-10px] w-[190px]" />
-            )}
-          </div>
-        </div>
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
-        >
-          {mutation.isPending ? 'Extraindo receita…' : 'Adicionar receita'}
-        </button>
-      </form>
-
+      {/* Keyed by door so the panel drops onto the wall again on every
+          switch, the same entrance every other tile makes. */}
       <div
-        className="tile-drop flex items-center gap-3"
-        style={{ '--i': 2 } as CSSProperties}
-        aria-hidden="true"
+        key={open}
+        role="tabpanel"
+        id={`panel-${open}`}
+        aria-labelledby={`door-${open}`}
+        className="flex flex-col gap-6"
       >
-        <span className="h-0.5 flex-1 bg-ink/15" />
-        <span className="font-display text-[0.7rem] font-extrabold tracking-[0.2em] text-ink-muted uppercase">
-          ou
-        </span>
-        <span className="h-0.5 flex-1 bg-ink/15" />
-      </div>
+        {open === 'photos' && (
+          <>
+            <div className="tile-drop flex flex-col gap-2" style={{ '--i': 1 } as CSSProperties}>
+              <h2 className="font-display text-[1.7rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-ink">
+                A receita está no <span className="text-accent">papel</span>?
+              </h2>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                Página de livro, caderno, print — manda a foto que eu decifro.
+                Se a receita ocupa mais de uma página, manda todas na ordem: eu
+                junto tudo numa receita só.
+              </p>
+            </div>
 
-      <form
-        onSubmit={handleSubmitPhotos}
-        className="tile-drop flex flex-col gap-4"
-        style={{ '--i': 3 } as CSSProperties}
-      >
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="recipe-photos"
-            className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
-          >
-            Fotos da receita
-          </label>
-          <p className="text-xs leading-relaxed text-ink-muted">
-            Página de livro, caderno, print. Se a receita ocupa mais de uma
-            página, mande todas na ordem — eu junto tudo numa receita só.
-          </p>
-          <input
-            id="recipe-photos"
-            type="file"
-            multiple
-            accept={ACCEPTED_PHOTO_TYPES}
-            onChange={handleChoosePhotos}
-            disabled={mutation.isPending}
-            className="field w-full cursor-pointer px-4 py-3 text-sm file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-display file:text-xs file:font-extrabold file:tracking-[0.14em] file:text-accent file:uppercase"
-          />
-        </div>
+            {mutation.isPending && <CookingLoader source="photos" />}
 
-        {photos.length > 0 && (
-          <ul className="grid grid-cols-3 gap-3">
-            {photos.map((photo, index) => (
-              <li key={`${photo.name}-${index}`} className="tile relative overflow-hidden">
-                <img
-                  src={previews[index]}
-                  alt={`Foto ${index + 1} da receita`}
-                  className="aspect-square w-full object-cover"
-                />
-                {/* The number, not the filename: photos straight from a
-                    camera are all called the same thing, and what matters
-                    here is which page comes first. */}
-                <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-paper font-display text-[0.65rem] font-extrabold text-ink">
-                  {index + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemovePhoto(index)}
-                  disabled={mutation.isPending}
-                  aria-label={`Remover foto ${index + 1}`}
-                  className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-accent font-display text-[0.7rem] font-extrabold text-accent-ink"
+            <form
+              onSubmit={handleSubmitPhotos}
+              className="tile-drop flex flex-col gap-4"
+              style={{ '--i': 2 } as CSSProperties}
+            >
+              <div className="flex flex-col gap-2">
+                <label htmlFor="recipe-photos" className={LABEL_CLASS}>
+                  Fotos da receita
+                </label>
+                <MascotStage
+                  room="mt-30"
+                  pose={
+                    !mutation.isPending && (
+                      <MascotSnapping className="mascot-lift pointer-events-none absolute right-1 bottom-full z-10 mb-[-9px] w-[106px]" />
+                    )
+                  }
                 >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <input
+                    id="recipe-photos"
+                    type="file"
+                    multiple
+                    accept={ACCEPTED_PHOTO_TYPES}
+                    onChange={handleChoosePhotos}
+                    disabled={mutation.isPending}
+                    className="field w-full cursor-pointer px-4 py-3 text-sm file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-display file:text-xs file:font-extrabold file:tracking-[0.14em] file:text-accent file:uppercase"
+                  />
+                </MascotStage>
+              </div>
+
+              {photos.length > 0 && (
+                <ul className="grid grid-cols-3 gap-3">
+                  {photos.map((photo, index) => (
+                    <li key={`${photo.name}-${index}`} className="tile relative overflow-hidden">
+                      <img
+                        src={previews[index]}
+                        alt={`Foto ${index + 1} da receita`}
+                        className="aspect-square w-full object-cover"
+                      />
+                      {/* The number, not the filename: photos straight from a
+                          camera are all called the same thing, and what
+                          matters here is which page comes first. */}
+                      <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-paper font-display text-[0.65rem] font-extrabold text-ink">
+                        {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(index)}
+                        disabled={mutation.isPending}
+                        aria-label={`Remover foto ${index + 1}`}
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-accent font-display text-[0.7rem] font-extrabold text-accent-ink"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <button type="submit" disabled={mutation.isPending || photos.length === 0} className={BUTTON_CLASS}>
+                {mutation.isPending ? 'Lendo as fotos…' : 'Extrair das fotos'}
+              </button>
+            </form>
+          </>
         )}
 
-        <button
-          type="submit"
-          disabled={mutation.isPending || photos.length === 0}
-          className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
-        >
-          {mutation.isPending ? 'Lendo as fotos…' : 'Extrair das fotos'}
-        </button>
-      </form>
+        {open === 'video' && (
+          <>
+            <div className="tile-drop flex flex-col gap-2" style={{ '--i': 1 } as CSSProperties}>
+              <h2 className="font-display text-[1.7rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-ink">
+                Achou num <span className="text-accent">vídeo</span>?
+              </h2>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                Reel, Short, TikTok. Eu escuto o que a pessoa fala, leio a
+                legenda do post e junto as duas coisas numa receita. Costuma
+                demorar mais que as outras — vale a espera.
+              </p>
+            </div>
 
-      <div
-        className="tile-drop flex items-center gap-3"
-        style={{ '--i': 4 } as CSSProperties}
-        aria-hidden="true"
-      >
-        <span className="h-0.5 flex-1 bg-ink/15" />
-        <span className="font-display text-[0.7rem] font-extrabold tracking-[0.2em] text-ink-muted uppercase">
-          ou
-        </span>
-        <span className="h-0.5 flex-1 bg-ink/15" />
-      </div>
+            {mutation.isPending && <CookingLoader source="video" />}
 
-      <form
-        onSubmit={handleSubmitVideo}
-        className="tile-drop flex flex-col gap-4"
-        style={{ '--i': 5 } as CSSProperties}
-      >
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor="recipe-video-url"
-            className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
-          >
-            Link do vídeo
-          </label>
-          <p className="text-xs leading-relaxed text-ink-muted">
-            Reel, Short, TikTok. Eu escuto o que a pessoa fala, leio a legenda do
-            post, e junto as duas coisas numa receita. Costuma demorar mais que
-            as outras — vale a espera.
+            <form
+              onSubmit={handleSubmitVideo}
+              className="tile-drop flex flex-col gap-5"
+              style={{ '--i': 2 } as CSSProperties}
+            >
+              <div className="flex flex-col gap-2">
+                <label htmlFor="recipe-video-url" className={LABEL_CLASS}>
+                  Link do vídeo
+                </label>
+                <MascotStage
+                  room="mt-24"
+                  pose={
+                    !mutation.isPending && (
+                      <MascotFilming className="mascot-lift pointer-events-none absolute right-0 bottom-full z-10 mb-[-9px] w-[186px]" />
+                    )
+                  }
+                >
+                  <input
+                    id="recipe-video-url"
+                    type="url"
+                    required
+                    placeholder="https://… aquele reel que você salvou"
+                    value={videoUrl}
+                    onChange={(event) => setVideoUrl(event.target.value)}
+                    disabled={mutation.isPending}
+                    className="field w-full px-4 py-3"
+                  />
+                </MascotStage>
+              </div>
+              <button type="submit" disabled={mutation.isPending} className={BUTTON_CLASS}>
+                {mutation.isPending ? 'Assistindo o vídeo…' : 'Extrair do vídeo'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {open === 'link' && (
+          <>
+            <div className="tile-drop flex flex-col gap-2" style={{ '--i': 1 } as CSSProperties}>
+              <h2 className="font-display text-[1.7rem] leading-[1.05] font-extrabold tracking-[-0.03em] text-ink">
+                Tem o <span className="text-accent">link</span> da receita?
+              </h2>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                Cola aqui e deixa comigo. Eu leio a página inteira — inclusive a
+                parte sobre a viagem da autora à Toscana — e trago só o que
+                interessa.
+              </p>
+            </div>
+
+            {mutation.isPending && <CookingLoader source="link" />}
+
+            <form
+              onSubmit={handleSubmitUrl}
+              className="tile-drop flex flex-col gap-5"
+              style={{ '--i': 2 } as CSSProperties}
+            >
+              <div className="flex flex-col gap-2">
+                <label htmlFor="recipe-url" className={LABEL_CLASS}>
+                  Link da receita
+                </label>
+                <MascotStage
+                  room="mt-16"
+                  pose={
+                    !mutation.isPending && (
+                      <MascotLounging className="mascot-lift pointer-events-none absolute right-0 bottom-full z-10 mb-[-10px] w-[190px]" />
+                    )
+                  }
+                >
+                  <input
+                    id="recipe-url"
+                    type="url"
+                    required
+                    placeholder="https://… pode ser aquele blog gigante"
+                    value={url}
+                    onChange={(event) => setUrl(event.target.value)}
+                    disabled={mutation.isPending}
+                    className="field w-full px-4 py-3"
+                  />
+                </MascotStage>
+              </div>
+              <button type="submit" disabled={mutation.isPending} className={BUTTON_CLASS}>
+                {mutation.isPending ? 'Extraindo receita…' : 'Adicionar receita'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {mutation.isError && (
+          <p role="alert" className="border-l-4 border-accent pl-3 text-sm font-medium text-ink">
+            {mutation.error.message}
           </p>
-          <div className="field-nest relative">
-            <input
-              id="recipe-video-url"
-              type="url"
-              required
-              placeholder="https://… aquele reel que você salvou"
-              value={videoUrl}
-              onChange={(event) => setVideoUrl(event.target.value)}
-              disabled={mutation.isPending}
-              className="field w-full px-4 py-3"
-            />
-          </div>
-        </div>
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
-        >
-          {mutation.isPending ? 'Assistindo o vídeo…' : 'Extrair do vídeo'}
-        </button>
-      </form>
-
-      {mutation.isError && (
-        <p role="alert" className="border-l-4 border-accent pl-3 text-sm font-medium text-ink">
-          {mutation.error.message}
-        </p>
-      )}
+        )}
+      </div>
     </div>
   )
 }

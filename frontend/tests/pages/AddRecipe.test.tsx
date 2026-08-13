@@ -22,8 +22,18 @@ function renderAddRecipe() {
   )
 }
 
+/**
+ * The three doors are tabs now, so every flow starts by opening its own —
+ * only the selected door's form is mounted at any time.
+ */
+async function openTab(name: string) {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('tab', { name }))
+}
+
 async function submitUrl(url: string) {
   const user = userEvent.setup()
+  await openTab('Link')
   await user.type(screen.getByLabelText('Link da receita'), url)
   await user.click(screen.getByRole('button', { name: 'Adicionar receita' }))
 }
@@ -37,6 +47,7 @@ function photoNamed(name: string) {
 
 async function choosePhotos(...names: string[]) {
   const user = userEvent.setup()
+  await openTab('Imagem')
   await user.upload(screen.getByLabelText('Fotos da receita'), names.map(photoNamed))
 }
 
@@ -48,11 +59,59 @@ async function submitPhotos(...names: string[]) {
 
 async function submitVideo(url: string) {
   const user = userEvent.setup()
+  await openTab('Vídeo')
   await user.type(screen.getByLabelText('Link do vídeo'), url)
   await user.click(screen.getByRole('button', { name: 'Extrair do vídeo' }))
 }
 
 describe('AddRecipe', () => {
+  it('given the page has just opened, then the three doors are offered as tabs, image first and selected', () => {
+    renderAddRecipe()
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Imagem',
+      'Vídeo',
+      'Link',
+    ])
+    expect(screen.getByRole('tab', { name: 'Imagem' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('given a door is open, then the other two doors are closed', async () => {
+    // One form on screen at a time is the point of the change: three stacked
+    // forms made the page read as three tasks instead of one with a choice.
+    renderAddRecipe()
+    expect(screen.getByLabelText('Fotos da receita')).toBeInTheDocument()
+
+    await openTab('Link')
+
+    expect(screen.getByLabelText('Link da receita')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Fotos da receita')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Link do vídeo')).not.toBeInTheDocument()
+  })
+
+  it('given something already typed in a door, when the user looks at another and comes back, then what was typed is still there', async () => {
+    const user = userEvent.setup()
+    renderAddRecipe()
+
+    await openTab('Link')
+    await user.type(screen.getByLabelText('Link da receita'), 'https://example.com/bolo')
+    await openTab('Vídeo')
+    await openTab('Link')
+
+    expect(screen.getByLabelText('Link da receita')).toHaveValue('https://example.com/bolo')
+  })
+
+  it('given a focused tab, when the user presses the right arrow, then the next door opens', async () => {
+    const user = userEvent.setup()
+    renderAddRecipe()
+
+    await user.click(screen.getByRole('tab', { name: 'Imagem' }))
+    await user.keyboard('{ArrowRight}')
+
+    expect(screen.getByRole('tab', { name: 'Vídeo' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('Link do vídeo')).toBeInTheDocument()
+  })
+
   it('given a valid recipe link, when the extraction succeeds, then it shows a success message with the recipe title', async () => {
     server.use(
       http.post(`${API_BASE_URL}/api/recipes`, () =>
