@@ -72,10 +72,19 @@ server {
         access_log off;
     }
 
+    # nginx's mime.types knows no .webmanifest, and would hand the file over
+    # as application/octet-stream. `types {}` empties the map for this one
+    # location so default_type is what answers.
+    location = /manifest.webmanifest {
+        types { }
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache";
+    }
+
     # The service worker and the entry point must never be served stale, or
     # the app pins itself to an old build: index.html names the hashed
     # bundles, and sw.js decides when to fetch a new one.
-    location ~* ^/(index\.html|sw\.js|registerSW\.js|manifest\.webmanifest)$ {
+    location ~* ^/(index\.html|sw\.js|registerSW\.js)$ {
         add_header Cache-Control "no-cache";
     }
 
