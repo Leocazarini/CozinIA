@@ -23,6 +23,21 @@ class Settings(BaseSettings):
     # vision-capable model, and the model chosen for text extraction is not
     # necessarily one. Keeping them apart lets either be swapped alone.
     ai_vision_model: str = ""
+    # Separate for the same reason: this one turns a video's noisy narration
+    # plus its written description into one clean recipe document, which needs
+    # stronger instruction-following on long, messy input than pulling fields
+    # out of already-clean text does.
+    ai_video_model: str = ""
+    # Speech-to-text goes to OpenRouter's /audio/transcriptions endpoint,
+    # which only accepts transcription models — a chat model is never valid
+    # there, so this cannot share any of the vars above.
+    ai_audio_model: str = ""
+    # Optional path to a Netscape cookies.txt handed to yt-dlp. Instagram and
+    # TikTok are the platforms whose recipes are spoken rather than written —
+    # exactly the ones that refuse anonymous requests from a datacenter IP.
+    # Empty (the default) keeps yt-dlp anonymous; a real session file is a
+    # live credential, so see docs/DOCKER.md before mounting one.
+    video_cookies_file: str | None = None
 
 
 @lru_cache

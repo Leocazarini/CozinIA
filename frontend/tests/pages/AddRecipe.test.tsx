@@ -46,6 +46,12 @@ async function submitPhotos(...names: string[]) {
   await user.click(screen.getByRole('button', { name: 'Extrair das fotos' }))
 }
 
+async function submitVideo(url: string) {
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Link do vídeo'), url)
+  await user.click(screen.getByRole('button', { name: 'Extrair do vídeo' }))
+}
+
 describe('AddRecipe', () => {
   it('given a valid recipe link, when the extraction succeeds, then it shows a success message with the recipe title', async () => {
     server.use(
@@ -159,6 +165,88 @@ describe('AddRecipe', () => {
         'Não encontramos uma receita aqui — não identificamos ingredientes nem modo de preparo.',
       ),
     ).toBeInTheDocument()
+  })
+
+  it('given the link of a recipe video, when the extraction succeeds, then it shows the same success message the other doors show', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/video`, () =>
+        HttpResponse.json(
+          buildRecipe({ title: 'Bolo de cenoura do Reel', source_type: 'video' }),
+          { status: 201 },
+        ),
+      ),
+    )
+
+    renderAddRecipe()
+    await submitVideo('https://www.youtube.com/watch?v=abc123')
+
+    expect(await screen.findByText(/Bolo de cenoura do Reel/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver receitas' })).toBeInTheDocument()
+  })
+
+  it('given a video link, when the user submits, then it goes to the video endpoint and not the link one', async () => {
+    // Which door a link goes through is the user's choice: a Reel URL pasted
+    // in the link field would be scraped as a page, which is not the same
+    // thing at all.
+    let videoRequests = 0
+    let linkRequests = 0
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/video`, () => {
+        videoRequests += 1
+        return HttpResponse.json(buildRecipe(), { status: 201 })
+      }),
+      http.post(`${API_BASE_URL}/api/recipes`, () => {
+        linkRequests += 1
+        return HttpResponse.json(buildRecipe(), { status: 201 })
+      }),
+    )
+
+    renderAddRecipe()
+    await submitVideo('https://www.instagram.com/reel/xyz')
+
+    await screen.findByRole('link', { name: 'Ver receitas' })
+    expect(videoRequests).toBe(1)
+    expect(linkRequests).toBe(0)
+  })
+
+  it('given the video platform is blocking the server, when the user submits, then it shows the API error message in Portuguese', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/video`, () =>
+        HttpResponse.json(
+          {
+            detail:
+              'A plataforma do vídeo está bloqueando as requisições do nosso servidor. Tente novamente mais tarde.',
+          },
+          { status: 503 },
+        ),
+      ),
+    )
+
+    renderAddRecipe()
+    await submitVideo('https://www.youtube.com/watch?v=bloqueado')
+
+    expect(
+      await screen.findByText(
+        'A plataforma do vídeo está bloqueando as requisições do nosso servidor. Tente novamente mais tarde.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('given a video is being read, when the request is in flight, then the loader narrates the video steps', async () => {
+    // The longest wait of the three doors — metadata, then audio, then two
+    // model passes — so what it says it is doing has to match what it is
+    // actually doing.
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/video`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        return HttpResponse.json(buildRecipe(), { status: 201 })
+      }),
+    )
+
+    renderAddRecipe()
+    await submitVideo('https://www.youtube.com/watch?v=abc123')
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Abrindo o vídeo…')
   })
 
   it('given the request is in flight, when the user submits, then the button shows a loading label and is disabled', async () => {

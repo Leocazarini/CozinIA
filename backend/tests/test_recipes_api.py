@@ -1,10 +1,10 @@
-"""Specifications for the recipe API endpoints (create from a link, create
-from photos, list/get/update/delete).
+"""Specifications for the recipe API endpoints (create from a link, from
+photos, or from a video link, list/get/update/delete).
 
 Exercises the full HTTP stack via TestClient against the real Postgres test
-database. Scraping, photo transcription and AI extraction are stubbed — no
-real network or model calls are made — including the paths that map domain
-exceptions to user-facing (Portuguese) HTTP responses.
+database. Scraping, photo transcription, video reading and AI extraction are
+stubbed — no real network or model calls are made — including the paths that
+map domain exceptions to user-facing (Portuguese) HTTP responses.
 """
 
 import io
@@ -30,6 +30,20 @@ from app.services.image_intake import MAX_IMAGES
 from app.services.image_transcriber import UnreadableImageError
 from app.services.recipe_service import RecipeService
 from app.services.scraper import UnreachableUrlError
+from app.services.video_source import (
+    MAX_VIDEO_DURATION_MINUTES,
+    NotASingleVideoError,
+    NoVideoTextError,
+    SpeechSource,
+    UnsupportedVideoUrlError,
+    VideoAccessBlockedError,
+    VideoMaterial,
+    VideoTooLongError,
+    VideoUnavailableError,
+)
+from app.services.video_transcriber import UnreadableVideoError
+
+VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 FAKE_EXTRACTION = RecipeExtraction(
     title="Bolo de cenoura",
@@ -50,6 +64,21 @@ async def _stub_extract(text: str) -> RecipeExtraction:
 
 async def _stub_transcribe(images: Sequence[bytes]) -> str:
     return "texto transcrito das fotos"
+
+
+async def _stub_read_video(url: str) -> VideoMaterial:
+    return VideoMaterial(
+        title="Bolo de cenoura da vovó",
+        uploader="Cozinha da Vovó",
+        description="3 cenouras médias, 3 ovos, 2 xícaras de açúcar",
+        caption_transcript="bate tudo no liquidificador e leva ao forno",
+        speech_source=SpeechSource.AUTOMATIC_CAPTIONS,
+        audio=None,
+    )
+
+
+async def _stub_transcribe_video(material: VideoMaterial) -> str:
+    return "receita montada a partir do vídeo"
 
 
 def _jpeg_bytes() -> bytes:
@@ -95,20 +124,29 @@ async def _clean_database_after_test() -> AsyncGenerator[None, None]:
 
 @pytest.fixture
 def make_client() -> Callable[..., TestClient]:
-    """Factory fixture: a TestClient with the recipe service's
-    scrape/transcribe/extract replaced by the given stubs (defaults to a
+    """Factory fixture: a TestClient with the recipe service's source-reading
+    and extraction collaborators replaced by the given stubs (defaults to a
     successful extraction)."""
 
     def _make(
         *,
         scrape: Callable = _stub_scrape,
         transcribe: Callable = _stub_transcribe,
+        read_video: Callable = _stub_read_video,
+        transcribe_video: Callable = _stub_transcribe_video,
         extract: Callable = _stub_extract,
     ) -> TestClient:
         def override_get_recipe_service(
             session=Depends(get_db_session),
         ) -> RecipeService:
-            return RecipeService(session, scrape=scrape, transcribe=transcribe, extract=extract)
+            return RecipeService(
+                session,
+                scrape=scrape,
+                transcribe=transcribe,
+                read_video=read_video,
+                transcribe_video=transcribe_video,
+                extract=extract,
+            )
 
         app.dependency_overrides[get_db_session] = _override_get_db_session
         app.dependency_overrides[get_recipe_service] = override_get_recipe_service
@@ -157,19 +195,224 @@ def test_given_photos_of_a_recipe_when_posting_them_then_it_is_created_and_retur
     assert uuid.UUID(body["id"])
 
 
-def test_given_recipes_from_both_links_and_photos_when_listing_then_they_come_back_together(
+def test_given_a_video_link_when_posting_it_then_the_recipe_is_created_and_returned(
     client: TestClient,
 ) -> None:
-    """Given one recipe added from a link and another from photos, when
-    listing, then both appear in the same list — where a recipe came from
-    doesn't separate it from the others."""
+    """Given the link of a recipe video, when POSTed to /api/recipes/video,
+    then the extracted recipe is persisted and returned — keeping the video's
+    URL, unlike the photo door, since there is a page to go back to."""
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["title"] == "Bolo de cenoura"
+    assert body["ingredients"][0]["name"] == "cenoura"
+    assert body["source_url"] == VIDEO_URL
+    assert body["source_type"] == "video"
+    assert uuid.UUID(body["id"])
+
+
+def test_given_recipes_from_links_photos_and_videos_when_listing_then_they_come_back_together(
+    client: TestClient,
+) -> None:
+    """Given one recipe added from a link, one from photos and one from a
+    video, when listing, then all three appear in the same list — where a
+    recipe came from doesn't separate it from the others."""
     client.post("/api/recipes", json={"url": "https://example.com/receita"})
     client.post("/api/recipes/image", files=_photo_uploads())
+    client.post("/api/recipes/video", json={"url": VIDEO_URL})
 
     response = client.get("/api/recipes")
 
     assert response.status_code == 200
-    assert sorted(recipe["source_type"] for recipe in response.json()) == ["image", "link"]
+    assert sorted(recipe["source_type"] for recipe in response.json()) == [
+        "image",
+        "link",
+        "video",
+    ]
+
+
+def test_given_a_link_with_no_video_in_it_when_posting_it_as_a_video_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given a link that holds no video — an ordinary recipe page, which
+    belongs in the link door — when POSTed to /api/recipes/video, then a 422
+    with a Portuguese message is returned and nothing is persisted."""
+
+    async def not_a_video(url: str) -> VideoMaterial:
+        raise UnsupportedVideoUrlError("no video there")
+
+    client = make_client(read_video=not_a_video)
+
+    response = client.post("/api/recipes/video", json={"url": "https://panelinha.com.br/receita"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Não reconhecemos um vídeo nesse link."
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_a_channel_link_when_posting_it_as_a_video_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the link of a channel, profile or playlist, when POSTed to
+    /api/recipes/video, then a 422 asks for a specific video instead."""
+
+    async def a_playlist(url: str) -> VideoMaterial:
+        raise NotASingleVideoError("that's a channel")
+
+    client = make_client(read_video=a_playlist)
+
+    response = client.post(
+        "/api/recipes/video", json={"url": "https://www.youtube.com/@cozinhadavovo"}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Esse link é de um canal, perfil ou playlist. Envie o link de um vídeo específico."
+    )
+
+
+def test_given_an_unavailable_video_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given a video that is private, deleted or region-locked, when POSTed to
+    /api/recipes/video, then a 422 says the video could not be reached."""
+
+    async def unavailable(url: str) -> VideoMaterial:
+        raise VideoUnavailableError("private video")
+
+    client = make_client(read_video=unavailable)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não foi possível acessar esse vídeo. Ele pode ser privado, ter sido removido, "
+        "ou exigir login."
+    )
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_the_platform_is_blocking_our_server_when_posting_then_returns_a_service_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the platform refusing our server with an anti-bot challenge, when
+    POSTed to /api/recipes/video, then a 503 says so.
+
+    Deliberately not a 422: the user's link is fine and it is our end being
+    refused, so telling them the video is unavailable would send them
+    debugging the wrong thing.
+    """
+
+    async def blocked(url: str) -> VideoMaterial:
+        raise VideoAccessBlockedError("sign in to confirm you're not a bot")
+
+    client = make_client(read_video=blocked)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "A plataforma do vídeo está bloqueando as requisições do nosso servidor. "
+        "Tente novamente mais tarde."
+    )
+
+
+def test_given_a_video_that_is_too_long_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given a video longer than the limit, when POSTed to /api/recipes/video,
+    then a 422 states the limit — interpolated from the constant, so the
+    message can never drift from the rule it explains."""
+
+    async def too_long(url: str) -> VideoMaterial:
+        raise VideoTooLongError("3 hours")
+
+    client = make_client(read_video=too_long)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        f"Vídeo muito longo. O limite é {MAX_VIDEO_DURATION_MINUTES} minutos."
+    )
+
+
+def test_given_a_video_with_nothing_to_read_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given a video with no captions, no speech in its audio and nothing
+    written, when POSTed to /api/recipes/video, then a 422 explains what a
+    usable video needs."""
+
+    async def nothing_to_read(material: VideoMaterial) -> str:
+        raise NoVideoTextError("nothing at all")
+
+    client = make_client(transcribe_video=nothing_to_read)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não conseguimos ouvir nem ler nenhuma receita nesse vídeo. Tente um vídeo com "
+        "legendas, com narração, ou com a receita escrita na descrição."
+    )
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_a_video_that_yields_no_recipe_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given a video read fine but with no recipe to reconstruct, when POSTed
+    to /api/recipes/video, then a 422 with a Portuguese message is returned."""
+
+    async def unreadable(material: VideoMaterial) -> str:
+        raise UnreadableVideoError("no recipe in there")
+
+    client = make_client(transcribe_video=unreadable)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não conseguimos montar a receita a partir desse vídeo. Tente um vídeo em que os "
+        "ingredientes e o modo de preparo sejam ditos ou escritos."
+    )
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_a_video_that_is_not_a_recipe_when_posting_then_returns_the_source_neutral_rejection(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the AI determines the video shows no recipe, when POSTed to
+    /api/recipes/video, then the byte-identical rejection the link and photo
+    doors produce is returned — one message that has to read correctly for all
+    three sources."""
+
+    async def not_a_recipe_extract(text: str) -> RecipeExtraction:
+        raise NotARecipeError("o vídeo é um unboxing de air fryer")
+
+    client = make_client(extract=not_a_recipe_extract)
+
+    response = client.post("/api/recipes/video", json={"url": VIDEO_URL})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não encontramos uma receita aqui — não identificamos ingredientes "
+        "nem modo de preparo."
+    )
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_a_value_that_is_not_a_url_when_posting_a_video_then_it_is_rejected(
+    client: TestClient,
+) -> None:
+    """Given something that isn't a URL at all, when POSTed to
+    /api/recipes/video, then it is rejected before any video is read."""
+    response = client.post("/api/recipes/video", json={"url": "não é um link"})
+
+    assert response.status_code == 422
+    assert client.get("/api/recipes").json() == []
 
 
 def test_given_no_photos_at_all_when_posting_then_returns_a_portuguese_error(

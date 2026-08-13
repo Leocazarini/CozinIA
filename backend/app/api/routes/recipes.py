@@ -1,5 +1,5 @@
-"""Recipe endpoints: create from a link or from photos (both via AI
-extraction), list, retrieve, update, delete."""
+"""Recipe endpoints: create from a link, from photos, or from a video link
+(all three via AI extraction), list, retrieve, update, delete."""
 
 import uuid
 from collections.abc import Sequence
@@ -53,6 +53,21 @@ async def create_recipe_from_images(
     uploads = [(file.content_type, await file.read(_UPLOAD_READ_LIMIT)) for file in files]
     images = prepare_images(uploads)
     return await service.create_from_images(images)
+
+
+@router.post("/video", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
+async def create_recipe_from_video(
+    request: CreateRecipeRequest,
+    service: RecipeService = Depends(get_recipe_service),
+) -> Recipe:
+    """Extract a recipe from the given video link and persist it.
+
+    Takes the same payload as the link endpoint — a url is a url — but reads it
+    as a video: its description and its narration, rather than the text of a
+    page. Which door a link goes through is the user's choice, not something
+    guessed from the host.
+    """
+    return await service.create_from_video_url(str(request.url))
 
 
 @router.get("", response_model=list[RecipeResponse])
