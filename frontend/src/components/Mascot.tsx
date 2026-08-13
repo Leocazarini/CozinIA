@@ -392,36 +392,38 @@ function StandingLegs({ cx, hem }: { cx: number; hem: number }) {
 }
 
 /**
- * The camera from the era when you had to hold it against your face, drawn
- * in profile: body, fat lens barrel, viewfinder hump, wind knob. Its back
- * presses into the bowl's left edge — the mascot has no eye to raise it to,
- * so the pot's open face is where it goes — and the lens points down-left,
- * at whatever is in the field below. Authored around its own centre so the
+ * The camera from the era when you had to hold it against your face: body,
+ * viewfinder hump, wind knob, and a bulb flash out on its bracket. The
+ * shutter sits dead centre of the body, where a real one does. Its right
+ * edge presses into the bowl — the mascot has no eye to raise it to, so the
+ * pot's open face is where it goes. Authored around its own centre so the
  * caller can aim the whole thing with one rotation.
  */
 function VintageCamera({ x, y, angle }: { x: number; y: number; angle: number }) {
   return (
     <g transform={`translate(${x} ${y}) rotate(${angle})`}>
-      {/* The flash fires from the front of the lens, which is also the one
-          place a burst can read as "aimed at the subject". */}
+      {/* Bulb flash on its bracket, and the burst it throws. */}
+      <path d="M-15 -7h-9v-4" {...stroked} strokeWidth="2.4" />
+      <circle cx="-24" cy="-15" r="4.8" {...inked} />
       <g className="flash-pop" stroke="var(--color-accent)" strokeWidth="2.8" strokeLinecap="round">
-        {[180, 137, 223, 100, 260].map((degrees) => {
+        {[-180, -142, -100, -55, 152].map((degrees) => {
           const radians = (degrees * Math.PI) / 180
           return (
             <path
               key={degrees}
-              d={`M${-29 + Math.cos(radians) * 10} ${Math.sin(radians) * 10}l${Math.cos(radians) * 7} ${Math.sin(radians) * 7}`}
+              d={`M${-24 + Math.cos(radians) * 8.5} ${-15 + Math.sin(radians) * 8.5}l${Math.cos(radians) * 6.5} ${Math.sin(radians) * 6.5}`}
             />
           )
         })}
       </g>
 
-      <rect x="-27" y="-6.5" width="14" height="13" rx="2.5" {...inked} />
-      <circle cx="-29" cy="0" r="6.8" {...inked} />
-      <circle cx="-29" cy="0" r="3.2" fill={TILE} opacity="0.45" />
       <rect x="-15" y="-11" width="30" height="22" rx="3" {...inked} />
       <rect x="-4" y="-16.5" width="13" height="6" rx="2" {...inked} />
       <circle cx="10" cy="-14" r="3" {...inked} />
+      {/* Dead centre of the body, where a shutter actually sits. */}
+      <circle cx="0" cy="0" r="7.6" {...inked} />
+      <circle cx="0" cy="0" r="3.6" fill={TILE} opacity="0.45" />
+      <circle cx="-2.4" cy="-1.6" r="1.4" fill={SURFACE} />
     </g>
   )
 }
