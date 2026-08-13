@@ -11,14 +11,21 @@ import { Link } from 'react-router-dom'
 import { CookingLoader } from '../components/CookingLoader'
 import { MascotLounging } from '../components/Mascot'
 import { Quatrefoil } from '../components/icons'
-import { createRecipe, createRecipeFromImages } from '../api/recipes'
+import { createRecipe, createRecipeFromImages, createRecipeFromVideo } from '../api/recipes'
 
 /**
- * A recipe can arrive as a link or as photos, and the two are one flow with
- * two doors: same mutation, same loader, same success screen, and the saved
- * recipe is indistinguishable in the list afterwards.
+ * A recipe can arrive as a link, as photos, or as a video link, and the three
+ * are one flow with three doors: same mutation, same loader, same success
+ * screen, and the saved recipe is indistinguishable in the list afterwards.
+ *
+ * A video gets a field of its own rather than being detected from the link
+ * field: reading a Reel as a page and reading it as a video are different
+ * things, and which one the user wants is not something to guess from a host.
  */
-type Submission = { kind: 'link'; url: string } | { kind: 'photos'; files: File[] }
+type Submission =
+  | { kind: 'link'; url: string }
+  | { kind: 'photos'; files: File[] }
+  | { kind: 'video'; url: string }
 
 /** Mirrors MAX_IMAGES in backend/app/services/image_intake.py. */
 const MAX_PHOTOS = 8
@@ -27,13 +34,20 @@ const ACCEPTED_PHOTO_TYPES = 'image/jpeg,image/png,image/webp'
 
 export function AddRecipe() {
   const [url, setUrl] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: (submission: Submission) =>
-      submission.kind === 'link'
-        ? createRecipe(submission.url)
-        : createRecipeFromImages(submission.files),
+    mutationFn: (submission: Submission) => {
+      switch (submission.kind) {
+        case 'link':
+          return createRecipe(submission.url)
+        case 'photos':
+          return createRecipeFromImages(submission.files)
+        case 'video':
+          return createRecipeFromVideo(submission.url)
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] })
     },
@@ -52,6 +66,11 @@ export function AddRecipe() {
   function handleSubmitPhotos(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     mutation.mutate({ kind: 'photos', files: photos })
+  }
+
+  function handleSubmitVideo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    mutation.mutate({ kind: 'video', url: videoUrl })
   }
 
   function handleChoosePhotos(event: ChangeEvent<HTMLInputElement>) {
@@ -101,13 +120,12 @@ export function AddRecipe() {
         <p className="text-sm leading-relaxed text-ink-muted">
           Cole o link e deixa comigo. Eu leio a página inteira — inclusive a parte
           sobre a viagem da autora à Toscana — e trago só o que interessa. Se a
-          receita está num livro ou num caderno, me manda a foto.
+          receita está num livro ou num caderno, me manda a foto. Se está num
+          vídeo, manda o link que eu escuto.
         </p>
       </div>
 
-      {mutation.isPending && (
-        <CookingLoader source={mutation.variables?.kind === 'photos' ? 'photos' : 'link'} />
-      )}
+      {mutation.isPending && <CookingLoader source={mutation.variables?.kind ?? 'link'} />}
 
       <form
         onSubmit={handleSubmitUrl}
@@ -234,6 +252,57 @@ export function AddRecipe() {
           className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
         >
           {mutation.isPending ? 'Lendo as fotos…' : 'Extrair das fotos'}
+        </button>
+      </form>
+
+      <div
+        className="tile-drop flex items-center gap-3"
+        style={{ '--i': 4 } as CSSProperties}
+        aria-hidden="true"
+      >
+        <span className="h-0.5 flex-1 bg-ink/15" />
+        <span className="font-display text-[0.7rem] font-extrabold tracking-[0.2em] text-ink-muted uppercase">
+          ou
+        </span>
+        <span className="h-0.5 flex-1 bg-ink/15" />
+      </div>
+
+      <form
+        onSubmit={handleSubmitVideo}
+        className="tile-drop flex flex-col gap-4"
+        style={{ '--i': 5 } as CSSProperties}
+      >
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="recipe-video-url"
+            className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
+          >
+            Link do vídeo
+          </label>
+          <p className="text-xs leading-relaxed text-ink-muted">
+            Reel, Short, TikTok. Eu escuto o que a pessoa fala, leio a legenda do
+            post, e junto as duas coisas numa receita. Costuma demorar mais que
+            as outras — vale a espera.
+          </p>
+          <div className="field-nest relative">
+            <input
+              id="recipe-video-url"
+              type="url"
+              required
+              placeholder="https://… aquele reel que você salvou"
+              value={videoUrl}
+              onChange={(event) => setVideoUrl(event.target.value)}
+              disabled={mutation.isPending}
+              className="field w-full px-4 py-3"
+            />
+          </div>
+        </div>
+        <button
+          type="submit"
+          disabled={mutation.isPending}
+          className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
+        >
+          {mutation.isPending ? 'Assistindo o vídeo…' : 'Extrair do vídeo'}
         </button>
       </form>
 

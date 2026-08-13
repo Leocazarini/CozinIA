@@ -53,6 +53,23 @@ export async function createRecipeFromImages(files: File[]): Promise<Recipe> {
   return response.json() as Promise<Recipe>
 }
 
+/**
+ * Sends the link of a video to be read as a video — its narration and its
+ * description — rather than scraped as a page. Which door a link goes through
+ * is the user's choice, not something guessed from the host.
+ */
+export async function createRecipeFromVideo(url: string): Promise<Recipe> {
+  const response = await fetch(`${API_BASE_URL}/api/recipes/video`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response))
+  }
+  return response.json() as Promise<Recipe>
+}
+
 export async function updateRecipe(id: string, changes: UpdateRecipeInput): Promise<Recipe> {
   const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
     method: 'PATCH',

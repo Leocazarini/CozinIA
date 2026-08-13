@@ -1,10 +1,11 @@
 """Orchestrates the recipe extraction flow: read the source -> extract ->
 persist.
 
-Two kinds of source converge here — a link, which is scraped, and uploaded
-photos, which are transcribed. Both produce text, so everything from the AI
-extraction onwards is shared, and a persisted recipe is the same kind of
-thing whichever way it arrived.
+Three kinds of source converge here — a link, which is scraped; uploaded
+photos, which are transcribed; and a video link, which is read and then merged
+from its description and its narration. All three produce text, so everything
+from the AI extraction onwards is shared, and a persisted recipe is the same
+kind of thing whichever way it arrived.
 """
 
 import uuid
@@ -19,14 +20,19 @@ from app.schemas.recipe import RecipeExtraction
 from app.services.ai_extractor import extract_recipe
 from app.services.image_transcriber import transcribe_images
 from app.services.scraper import fetch_and_extract_text
+from app.services.video_source import VideoMaterial, fetch_video
+from app.services.video_transcriber import transcribe_video
 
 ScrapeFn = Callable[[str], Awaitable[str]]
 TranscribeFn = Callable[[Sequence[bytes]], Awaitable[str]]
+ReadVideoFn = Callable[[str], Awaitable[VideoMaterial]]
+TranscribeVideoFn = Callable[[VideoMaterial], Awaitable[str]]
 ExtractFn = Callable[[str], Awaitable[RecipeExtraction]]
 
 _AI_PROVIDER_NAME = "openrouter"
 _LINK_SOURCE = "link"
 _IMAGE_SOURCE = "image"
+_VIDEO_SOURCE = "video"
 
 
 class RecipeService:
@@ -39,11 +45,15 @@ class RecipeService:
         *,
         scrape: ScrapeFn = fetch_and_extract_text,
         transcribe: TranscribeFn = transcribe_images,
+        read_video: ReadVideoFn = fetch_video,
+        transcribe_video: TranscribeVideoFn = transcribe_video,
         extract: ExtractFn = extract_recipe,
     ) -> None:
         self._repository = RecipeRepository(session)
         self._scrape = scrape
         self._transcribe = transcribe
+        self._read_video = read_video
+        self._transcribe_video = transcribe_video
         self._extract = extract
 
     async def create_from_url(self, source_url: str) -> Recipe:
@@ -76,6 +86,28 @@ class RecipeService:
         extraction = await self._extract(text)
         return await self._persist(
             extraction, source_url=None, source_type=_IMAGE_SOURCE, raw_text=text
+        )
+
+    async def create_from_video_url(self, source_url: str) -> Recipe:
+        """Read the video at `source_url`, merge its description and narration
+        into one recipe document, extract the recipe from it via AI, and
+        persist the result.
+
+        What is kept in `raw_extracted_text` is the merged document rather than
+        the raw material: it is the readable record of what the recipe was
+        built from, the same way the transcription is for a photo.
+
+        Lets UnsupportedVideoUrlError, NotASingleVideoError,
+        VideoUnavailableError, VideoTooLongError, NoVideoTextError,
+        UnreadableVideoError, AIRequestError, MalformedAIResponseError and
+        NotARecipeError propagate unchanged — the API layer is responsible for
+        translating them into user-facing responses.
+        """
+        material = await self._read_video(source_url)
+        text = await self._transcribe_video(material)
+        extraction = await self._extract(text)
+        return await self._persist(
+            extraction, source_url=source_url, source_type=_VIDEO_SOURCE, raw_text=text
         )
 
     async def _persist(

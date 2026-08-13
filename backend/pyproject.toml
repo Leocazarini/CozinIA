@@ -20,6 +20,12 @@ dependencies = [
     # Decodes and downscales uploaded recipe photos before they go to the
     # vision model (see app/services/image_intake.py).
     "pillow>=11.0",
+    # Reads a video's metadata, subtitle tracks and audio out of a link
+    # (YouTube, Instagram, TikTok and friends) — see
+    # app/services/video_source.py. Floor with no ceiling on purpose: yt-dlp
+    # breaks whenever a platform changes its player, and the fix is always to
+    # upgrade, so rebuilding the image is routine maintenance for this feature.
+    "yt-dlp>=2026.7",
 ]
 
 [project.optional-dependencies]

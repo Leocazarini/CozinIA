@@ -7,9 +7,11 @@ import { MascotCooking } from './Mascot'
  * "something is happening"; naming the step the mascot is actually on says
  * *what*, which is what stops the wait from reading as a freeze.
  *
- * The two sources get their own captions because they really are doing
- * different work: narrating "Abrindo o link…" over a photo upload would be
- * describing something that isn't happening.
+ * Each source gets its own captions because they really are doing different
+ * work: narrating "Abrindo o link…" over a photo upload would be describing
+ * something that isn't happening. Video is the longest wait of the three —
+ * metadata, then the audio, then two model passes — so its captions have the
+ * most ground to cover.
  */
 const STEPS_BY_SOURCE = {
   link: [
@@ -23,6 +25,15 @@ const STEPS_BY_SOURCE = {
   photos: [
     'Olhando as fotos…',
     'Decifrando a letra…',
+    'Separando os ingredientes…',
+    'Anotando o modo de preparo…',
+    'Conferindo tempos e porções…',
+    'Provando o tempero…',
+  ],
+  video: [
+    'Abrindo o vídeo…',
+    'Ouvindo o que a pessoa fala…',
+    'Lendo a legenda do post…',
     'Separando os ingredientes…',
     'Anotando o modo de preparo…',
     'Conferindo tempos e porções…',

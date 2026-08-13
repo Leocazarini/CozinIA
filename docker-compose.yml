@@ -24,6 +24,9 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
       AI_VISION_MODEL: ${AI_VISION_MODEL:-anthropic/claude-sonnet-5}
+      AI_VIDEO_MODEL: ${AI_VIDEO_MODEL:-anthropic/claude-sonnet-5}
+      AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
+      VIDEO_COOKIES_FILE: ${VIDEO_COOKIES_FILE:-}
     volumes:
       - ./backend/app:/app/app
     depends_on:
@@ -79,6 +82,10 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
       AI_VISION_MODEL: ${AI_VISION_MODEL:-anthropic/claude-sonnet-5}
+      # Both model vars the video door needs: without them here the tests that
+      # assert which model was called would compare "" to "" and pass vacuously.
+      AI_VIDEO_MODEL: ${AI_VIDEO_MODEL:-anthropic/claude-sonnet-5}
+      AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
     depends_on:
       backend:
         condition: service_healthy

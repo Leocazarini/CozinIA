@@ -19,7 +19,7 @@ export interface Recipe {
   id: string
   /** Null for recipes extracted from photos — there is no page behind them. */
   source_url: string | null
-  source_type: 'link' | 'image'
+  source_type: 'link' | 'image' | 'video'
   title: string
   description: string | null
   image_url: string | null
