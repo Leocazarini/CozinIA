@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     # clearly on its own if it's actually missing when tests run.
     test_database_url: str | None = None
     openrouter_api_key: str = ""
-    ai_model: str = "anthropic/claude-sonnet-5"
+    ai_model: str = ""
+    # Separate from ai_model on purpose: reading recipe photos needs a
+    # vision-capable model, and the model chosen for text extraction is not
+    # necessarily one. Keeping them apart lets either be swapped alone.
+    ai_vision_model: str = ""
 
 
 @lru_cache

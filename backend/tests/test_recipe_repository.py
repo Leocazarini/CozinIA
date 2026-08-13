@@ -40,6 +40,35 @@ async def test_given_a_new_recipe_when_created_then_it_is_persisted_with_generat
     assert created.updated_at is not None
 
 
+async def test_given_a_recipe_from_a_link_when_created_then_its_source_type_defaults_to_link(
+    db_session: AsyncSession,
+) -> None:
+    """Given a recipe created without an explicit source_type, when
+    persisted, then the database defaults it to "link" — every recipe that
+    existed before images were supported is one."""
+    repository = RecipeRepository(db_session)
+
+    created = await repository.create(_build_recipe())
+
+    assert created.source_type == "link"
+
+
+async def test_given_a_recipe_from_images_when_created_then_it_persists_without_a_source_url(
+    db_session: AsyncSession,
+) -> None:
+    """Given a recipe extracted from uploaded images, which has no source
+    URL to point back to, when created, then it persists with a null
+    source_url and a source_type recording where it came from."""
+    repository = RecipeRepository(db_session)
+
+    created = await repository.create(_build_recipe(source_url=None, source_type="image"))
+    fetched = await repository.get(created.id)
+
+    assert fetched is not None
+    assert fetched.source_url is None
+    assert fetched.source_type == "image"
+
+
 async def test_given_a_persisted_recipe_when_fetched_by_id_then_it_is_returned(
     db_session: AsyncSession,
 ) -> None:

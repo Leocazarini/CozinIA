@@ -32,6 +32,27 @@ export async function createRecipe(url: string): Promise<Recipe> {
   return response.json() as Promise<Recipe>
 }
 
+/**
+ * Sends photos of one recipe — its pages, in order — as multipart form data.
+ * `Content-Type` is deliberately not set: the browser has to generate it
+ * itself so it can include the multipart boundary.
+ */
+export async function createRecipeFromImages(files: File[]): Promise<Recipe> {
+  const form = new FormData()
+  for (const file of files) {
+    form.append('files', file)
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/recipes/image`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response))
+  }
+  return response.json() as Promise<Recipe>
+}
+
 export async function updateRecipe(id: string, changes: UpdateRecipeInput): Promise<Recipe> {
   const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
     method: 'PATCH',
@@ -59,5 +80,5 @@ async function extractErrorMessage(response: Response): Promise<string> {
   } catch {
     // Response wasn't JSON — fall through to the generic message.
   }
-  return 'Não foi possível salvar a receita. Verifique o link e tente novamente.'
+  return 'Não foi possível salvar a receita. Tente novamente.'
 }

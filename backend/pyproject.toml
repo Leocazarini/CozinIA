@@ -15,6 +15,11 @@ dependencies = [
     "trafilatura>=1.12",
     "lxml>=5.0",
     "openai>=1.55",
+    # FastAPI raises at import time if UploadFile/File is declared without it.
+    "python-multipart>=0.0.9",
+    # Decodes and downscales uploaded recipe photos before they go to the
+    # vision model (see app/services/image_intake.py).
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]

@@ -17,7 +17,9 @@ export interface Step {
 
 export interface Recipe {
   id: string
-  source_url: string
+  /** Null for recipes extracted from photos — there is no page behind them. */
+  source_url: string | null
+  source_type: 'link' | 'image'
   title: string
   description: string | null
   image_url: string | null

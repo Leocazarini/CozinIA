@@ -5,6 +5,7 @@ export function buildRecipe(overrides: Partial<Recipe> = {}): Recipe {
   return {
     id: '11111111-1111-1111-1111-111111111111',
     source_url: 'https://example.com/receita',
+    source_type: 'link',
     title: 'Receita de teste',
     description: null,
     image_url: null,

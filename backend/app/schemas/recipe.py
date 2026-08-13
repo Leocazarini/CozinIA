@@ -82,7 +82,10 @@ class RecipeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    source_url: str
+    # Null when the recipe came from uploaded images — `source_type` says
+    # which of the two it was, so a null never has to be interpreted.
+    source_url: str | None = None
+    source_type: str
     title: str
     description: str | None = None
     image_url: str | None = None

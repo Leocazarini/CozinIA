@@ -1,24 +1,72 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type CSSProperties, type FormEvent, useState } from 'react'
+import {
+  type CSSProperties,
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { Link } from 'react-router-dom'
 import { CookingLoader } from '../components/CookingLoader'
 import { MascotLounging } from '../components/Mascot'
 import { Quatrefoil } from '../components/icons'
-import { createRecipe } from '../api/recipes'
+import { createRecipe, createRecipeFromImages } from '../api/recipes'
+
+/**
+ * A recipe can arrive as a link or as photos, and the two are one flow with
+ * two doors: same mutation, same loader, same success screen, and the saved
+ * recipe is indistinguishable in the list afterwards.
+ */
+type Submission = { kind: 'link'; url: string } | { kind: 'photos'; files: File[] }
+
+/** Mirrors MAX_IMAGES in backend/app/services/image_intake.py. */
+const MAX_PHOTOS = 8
+
+const ACCEPTED_PHOTO_TYPES = 'image/jpeg,image/png,image/webp'
 
 export function AddRecipe() {
   const [url, setUrl] = useState('')
+  const [photos, setPhotos] = useState<File[]>([])
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: createRecipe,
+    mutationFn: (submission: Submission) =>
+      submission.kind === 'link'
+        ? createRecipe(submission.url)
+        : createRecipeFromImages(submission.files),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] })
     },
   })
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const previews = useMemo(() => photos.map((photo) => URL.createObjectURL(photo)), [photos])
+  // Cleanup runs before the next effect and on unmount, so each batch of
+  // object URLs is released as soon as it stops being the current one.
+  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
+
+  function handleSubmitUrl(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    mutation.mutate(url)
+    mutation.mutate({ kind: 'link', url })
+  }
+
+  function handleSubmitPhotos(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    mutation.mutate({ kind: 'photos', files: photos })
+  }
+
+  function handleChoosePhotos(event: ChangeEvent<HTMLInputElement>) {
+    const chosen = Array.from(event.target.files ?? [])
+    // Appended rather than replaced: photographing a recipe that spans two
+    // pages usually means two trips to the picker, and the second one
+    // shouldn't discard the first page.
+    setPhotos((current) => [...current, ...chosen].slice(0, MAX_PHOTOS))
+    // Lets the same file be picked again after being removed — without this
+    // the input's value is unchanged and no change event fires.
+    event.target.value = ''
+  }
+
+  function handleRemovePhoto(index: number) {
+    setPhotos((current) => current.filter((_, position) => position !== index))
   }
 
   if (mutation.isSuccess) {
@@ -52,14 +100,17 @@ export function AddRecipe() {
         </h2>
         <p className="text-sm leading-relaxed text-ink-muted">
           Cole o link e deixa comigo. Eu leio a página inteira — inclusive a parte
-          sobre a viagem da autora à Toscana — e trago só o que interessa.
+          sobre a viagem da autora à Toscana — e trago só o que interessa. Se a
+          receita está num livro ou num caderno, me manda a foto.
         </p>
       </div>
 
-      {mutation.isPending && <CookingLoader />}
+      {mutation.isPending && (
+        <CookingLoader source={mutation.variables?.kind === 'photos' ? 'photos' : 'link'} />
+      )}
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmitUrl}
         className="tile-drop flex flex-col gap-5"
         style={{ '--i': 1 } as CSSProperties}
       >
@@ -107,15 +158,90 @@ export function AddRecipe() {
         >
           {mutation.isPending ? 'Extraindo receita…' : 'Adicionar receita'}
         </button>
-        {mutation.isError && (
-          <p
-            role="alert"
-            className="border-l-4 border-accent pl-3 text-sm font-medium text-ink"
-          >
-            {mutation.error.message}
-          </p>
-        )}
       </form>
+
+      <div
+        className="tile-drop flex items-center gap-3"
+        style={{ '--i': 2 } as CSSProperties}
+        aria-hidden="true"
+      >
+        <span className="h-0.5 flex-1 bg-ink/15" />
+        <span className="font-display text-[0.7rem] font-extrabold tracking-[0.2em] text-ink-muted uppercase">
+          ou
+        </span>
+        <span className="h-0.5 flex-1 bg-ink/15" />
+      </div>
+
+      <form
+        onSubmit={handleSubmitPhotos}
+        className="tile-drop flex flex-col gap-4"
+        style={{ '--i': 3 } as CSSProperties}
+      >
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="recipe-photos"
+            className="font-display text-xs font-extrabold tracking-[0.18em] text-ink uppercase"
+          >
+            Fotos da receita
+          </label>
+          <p className="text-xs leading-relaxed text-ink-muted">
+            Página de livro, caderno, print. Se a receita ocupa mais de uma
+            página, mande todas na ordem — eu junto tudo numa receita só.
+          </p>
+          <input
+            id="recipe-photos"
+            type="file"
+            multiple
+            accept={ACCEPTED_PHOTO_TYPES}
+            onChange={handleChoosePhotos}
+            disabled={mutation.isPending}
+            className="field w-full cursor-pointer px-4 py-3 text-sm file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-display file:text-xs file:font-extrabold file:tracking-[0.14em] file:text-accent file:uppercase"
+          />
+        </div>
+
+        {photos.length > 0 && (
+          <ul className="grid grid-cols-3 gap-3">
+            {photos.map((photo, index) => (
+              <li key={`${photo.name}-${index}`} className="tile relative overflow-hidden">
+                <img
+                  src={previews[index]}
+                  alt={`Foto ${index + 1} da receita`}
+                  className="aspect-square w-full object-cover"
+                />
+                {/* The number, not the filename: photos straight from a
+                    camera are all called the same thing, and what matters
+                    here is which page comes first. */}
+                <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-paper font-display text-[0.65rem] font-extrabold text-ink">
+                  {index + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(index)}
+                  disabled={mutation.isPending}
+                  aria-label={`Remover foto ${index + 1}`}
+                  className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-accent font-display text-[0.7rem] font-extrabold text-accent-ink"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <button
+          type="submit"
+          disabled={mutation.isPending || photos.length === 0}
+          className="tile tile-flat tile-pressable bg-accent py-3.5 font-display text-sm font-extrabold tracking-[0.14em] text-accent-ink uppercase disabled:opacity-55"
+        >
+          {mutation.isPending ? 'Lendo as fotos…' : 'Extrair das fotos'}
+        </button>
+      </form>
+
+      {mutation.isError && (
+        <p role="alert" className="border-l-4 border-accent pl-3 text-sm font-medium text-ink">
+          {mutation.error.message}
+        </p>
+      )}
     </div>
   )
 }
