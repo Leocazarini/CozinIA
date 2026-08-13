@@ -33,13 +33,22 @@ const stroked = { ...inked, fill: 'none' }
 
 /**
  * An arm or leg: one fat cobalt stroke with a thinner ceramic stroke laid
- * over it, yielding an outlined tube from a single path.
+ * over it, yielding an outlined tube from a single path. `width` exists for
+ * the objects built from that same tube at a thinner gauge — tripod legs, a
+ * spoon handle.
  */
-function Limb({ d }: { d: string }) {
+function Limb({ d, width = 9.6 }: { d: string; width?: number }) {
   return (
     <>
-      <path d={d} fill="none" stroke={TILE} strokeWidth="9.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={d} fill="none" stroke={SURFACE} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={TILE} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={SURFACE}
+        strokeWidth={width * 0.42}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </>
   )
 }
@@ -309,10 +318,14 @@ export function MascotLounging({ className }: MascotProps) {
   )
 }
 
-/** Shoulders down to the apron hem — used by the cooking pose. */
-function Body({ s, hem }: { s: number; hem: number }) {
+/**
+ * Shoulders down to the apron hem. Authored around x=60 — the axis the pot
+ * head sits on in the cooking pose — and shifted by `cx` for poses that
+ * stand somewhere else on the line.
+ */
+function Body({ s, hem, cx = 60 }: { s: number; hem: number; cx?: number }) {
   return (
-    <>
+    <g transform={cx === 60 ? undefined : `translate(${cx - 60} 0)`}>
       <path
         d={`M53 ${s}C45 ${s + 2} 39 ${s + 9} 37 ${s + 19}L36 ${hem - 5}Q36 ${hem} 41 ${hem}L79 ${hem}Q84 ${hem} 84 ${hem - 5}L83 ${s + 19}C81 ${s + 9} 75 ${s + 2} 67 ${s}Z`}
         {...inked}
@@ -322,7 +335,7 @@ function Body({ s, hem }: { s: number; hem: number }) {
         d={`M46 ${hem - 24}L74 ${hem - 24}L74 ${hem - 15}Q74 ${hem - 12} 71 ${hem - 12}L49 ${hem - 12}Q46 ${hem - 12} 46 ${hem - 15}Z`}
         {...inked}
       />
-    </>
+    </g>
   )
 }
 
@@ -358,6 +371,181 @@ export function MascotCooking({ className }: MascotProps) {
       </PotHead>
       <Ticks x={16} y={30} flip={-1} />
       <Ticks x={104} y={34} />
+    </svg>
+  )
+}
+
+/**
+ * The standing legs shared by the two upright poses: knees soft, feet
+ * splayed, soles landing a hair below y=0 so the boots sit *on* the ruled
+ * line rather than hovering over it. `cx` is the figure's axis.
+ */
+function StandingLegs({ cx, hem }: { cx: number; hem: number }) {
+  return (
+    <>
+      <Limb d={`M${cx - 8} ${hem - 2}C${cx - 9} ${hem + 6} ${cx - 11} ${hem + 13} ${cx - 12} ${hem + 19}`} />
+      <Boot x={cx - 14} y={-4} />
+      <Limb d={`M${cx + 8} ${hem - 2}C${cx + 9} ${hem + 6} ${cx + 11} ${hem + 13} ${cx + 12} ${hem + 19}`} />
+      <Boot x={cx + 14} y={-4} flip />
+    </>
+  )
+}
+
+/**
+ * The camera from the era when you had to hold it against your face, drawn
+ * in profile: body, fat lens barrel, viewfinder hump, wind knob. Its back
+ * presses into the bowl's left edge — the mascot has no eye to raise it to,
+ * so the pot's open face is where it goes — and the lens points down-left,
+ * at whatever is in the field below. Authored around its own centre so the
+ * caller can aim the whole thing with one rotation.
+ */
+function VintageCamera({ x, y, angle }: { x: number; y: number; angle: number }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(${angle})`}>
+      {/* The flash fires from the front of the lens, which is also the one
+          place a burst can read as "aimed at the subject". */}
+      <g className="flash-pop" stroke="var(--color-accent)" strokeWidth="2.8" strokeLinecap="round">
+        {[180, 137, 223, 100, 260].map((degrees) => {
+          const radians = (degrees * Math.PI) / 180
+          return (
+            <path
+              key={degrees}
+              d={`M${-29 + Math.cos(radians) * 10} ${Math.sin(radians) * 10}l${Math.cos(radians) * 7} ${Math.sin(radians) * 7}`}
+            />
+          )
+        })}
+      </g>
+
+      <rect x="-27" y="-6.5" width="14" height="13" rx="2.5" {...inked} />
+      <circle cx="-29" cy="0" r="6.8" {...inked} />
+      <circle cx="-29" cy="0" r="3.2" fill={TILE} opacity="0.45" />
+      <rect x="-15" y="-11" width="30" height="22" rx="3" {...inked} />
+      <rect x="-4" y="-16.5" width="13" height="6" rx="2" {...inked} />
+      <circle cx="10" cy="-14" r="3" {...inked} />
+    </g>
+  )
+}
+
+/**
+ * The crew: a movie camera with two film reels on a tripod, its lens
+ * pointing right at whoever is cooking. The tally light blinks, because a
+ * camera that is not recording is just furniture.
+ */
+function FilmRig({ cx }: { cx: number }) {
+  return (
+    <g>
+      <Limb width={7} d={`M${cx} -54C${cx - 13} -38 ${cx - 26} -16 ${cx - 32} -1`} />
+      <Limb width={7} d={`M${cx} -54C${cx + 13} -38 ${cx + 26} -16 ${cx + 32} -1`} />
+      <Limb width={5.6} d={`M${cx} -54C${cx + 2} -38 ${cx + 4} -20 ${cx + 5} -9`} />
+      <path d={`M${cx - 17} -26h34`} {...stroked} strokeWidth="2.4" />
+
+      {/* Tipped a few degrees toward the pot: the camera is framing a shot,
+          not sitting in a shop window. */}
+      <g transform={`rotate(5 ${cx} -54)`}>
+        <circle cx={cx - 12} cy={-96} r="10" {...inked} />
+        <circle cx={cx - 12} cy={-96} r="2.6" fill={TILE} />
+        <circle cx={cx + 13} cy={-96} r="10" {...inked} />
+        <circle cx={cx + 13} cy={-96} r="2.6" fill={TILE} />
+
+        <rect x={cx - 26} y={-88} width="52" height="32" rx="3.5" {...inked} />
+        {/* Lens barrel and hood, aimed at the cook. */}
+        <rect x={cx + 24} y={-79} width="11" height="14" rx="2" {...inked} />
+        <circle cx={cx + 41} cy={-72} r="7.2" {...inked} />
+        <circle cx={cx + 41} cy={-72} r="3.2" fill={TILE} opacity="0.45" />
+        {/* Crank on the far side, and the tally light. */}
+        <circle cx={cx - 30} cy={-72} r="3.4" {...inked} />
+        <path d={`M${cx - 30} -72l-6 -5`} {...stroked} strokeWidth="2.6" />
+        <circle className="rec-blink" cx={cx + 17} cy={-82} r="3.4" fill="var(--color-accent)" />
+      </g>
+    </g>
+  )
+}
+
+/**
+ * A pot standing on the line, distinct from the one the mascot wears: a
+ * belly that tapers to its base, a rolled rim, two ears, and the same steam
+ * curls the logo uses.
+ */
+function StovePot({ cx }: { cx: number }) {
+  return (
+    <g>
+      <Steam cx={cx} lidY={-36} short />
+      <path d={`M${cx - 20} -30c-8 0-8 11 0 11`} {...stroked} strokeWidth="3" />
+      <path d={`M${cx + 20} -30c8 0 8 11 0 11`} {...stroked} strokeWidth="3" />
+      <path
+        d={`M${cx - 24} -30L${cx - 18} -3Q${cx - 17} 0 ${cx - 14} 0L${cx + 14} 0Q${cx + 17} 0 ${cx + 18} -3L${cx + 24} -30Z`}
+        {...inked}
+      />
+      <rect x={cx - 28} y={-36} width="56" height="7" rx="3.5" {...inked} />
+    </g>
+  )
+}
+
+/**
+ * Pose four — the Imagem door. Standing on the field's top edge, leaning
+ * into the shot, an old camera held up against the bowl and the flash going
+ * off down into the field. The pot *is* the head, so pressing the camera
+ * against its open face is this mascot's version of raising it to the eye.
+ */
+export function MascotSnapping({ className }: MascotProps) {
+  return (
+    <svg className={className} viewBox="4 -124 100 132" fill="none" aria-hidden="true" focusable="false">
+      <StandingLegs cx={62} hem={-26} />
+      <g className="mascot-breathe">
+        {/* The lean into the shot, pivoting at the hips. */}
+        <g transform="rotate(-5 62 -26)">
+          <Body s={-74} hem={-26} cx={62} />
+          <Flour spots={[[46, -38, 1.5], [78, -33, 1.2], [68, -49, 1.1]]} />
+          {/* Head first, then the camera over its left edge: the bowl keeps
+              two thirds of its silhouette, which is the one thing that has
+              to survive at this size. */}
+          <PotHead cx={62} lidY={-102} tilt={-9} shortSteam />
+          {/* Far arm hangs; the near one reaches up under the lens barrel
+              and cradles it. Two arms on the camera read as one thick blob
+              at the size this is actually drawn at. */}
+          <Limb d="M74 -62C83 -58 85 -49 82 -42" />
+          <FlatHand x={84} y={-39} rotate={-76} scale={0.88} />
+          <VintageCamera x={48} y={-82} angle={-14} />
+          <Limb d="M50 -62C42 -63 34 -65 29 -68" />
+          <FlatHand x={30} y={-66} rotate={-52} flip scale={0.84} />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
+/**
+ * Pose five — the Vídeo door. A whole little set standing on the field's
+ * top edge: the mascot stirring a pot on the counter while a movie camera
+ * on a tripod films the take from the left.
+ */
+export function MascotFilming({ className }: MascotProps) {
+  return (
+    <svg className={className} viewBox="0 -124 216 132" fill="none" aria-hidden="true" focusable="false">
+      <FilmRig cx={52} />
+
+      <StandingLegs cx={162} hem={-26} />
+      <g className="mascot-breathe">
+        {/* Leaning over the pot, which is what stirring actually looks like. */}
+        <g transform="rotate(-5 162 -26)">
+          <Body s={-74} hem={-26} cx={162} />
+          <Flour spots={[[146, -38, 1.5], [178, -33, 1.2], [168, -49, 1.1]]} />
+          {/* Far arm hanging at the side. */}
+          <Limb d="M176 -63C187 -58 189 -48 186 -40" />
+          <FlatHand x={188} y={-37} rotate={-78} scale={0.9} />
+          <PotHead cx={162} lidY={-102} tilt={9} shortSteam />
+          {/* Stirring arm, and the spoon it drives into the pot — the
+              handle stands well clear of the rim so the gesture is legible
+              even though everything below the rim is hidden. */}
+          <g className="stir">
+            <Limb d="M150 -62C144 -58 138 -55 133 -53" />
+            <Limb width={5.4} d="M136 -62L108 -26" />
+            <FlatHand x={133} y={-53} rotate={-52} scale={0.9} />
+          </g>
+        </g>
+      </g>
+
+      <StovePot cx={118} />
     </svg>
   )
 }

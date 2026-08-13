@@ -320,6 +320,66 @@ body::before {
   translate: 0 -3px;
 }
 
+/*
+ * The Imagem door's flash: dark most of the cycle, one hard pop, one
+ * frame of afterglow. With motion off the burst simply stays lit — the
+ * rays are how the drawing says "camera", so they must never sit invisible.
+ */
+@keyframes flash-pop {
+  0%,
+  82%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  86% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  93% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
+.flash-pop {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: flash-pop 4.4s ease-out infinite;
+}
+
+/* The tally light on the tripod camera: recording, therefore blinking. */
+@keyframes rec-blink {
+  0%,
+  42% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0.18;
+  }
+}
+
+.rec-blink {
+  animation: rec-blink 1.7s ease-in-out infinite;
+}
+
+/* The stirring arm, pivoting at the shoulder so the spoon sweeps the pot. */
+@keyframes stir {
+  from {
+    transform: rotate(-5.5deg);
+  }
+  to {
+    transform: rotate(5.5deg);
+  }
+}
+
+.stir {
+  transform-box: fill-box;
+  transform-origin: 91% 8%;
+  animation: stir 1.5s ease-in-out infinite alternate;
+}
+
 /* Bubbles knocking against the inside of the pot while it cooks. */
 @keyframes bubble-up {
   0%,
@@ -381,7 +441,10 @@ body::before {
   .steam-flow,
   .bubble-up,
   .rail-pulse,
-  .caption-fade {
+  .caption-fade,
+  .flash-pop,
+  .rec-blink,
+  .stir {
     animation: none;
   }
 
