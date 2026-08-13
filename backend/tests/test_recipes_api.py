@@ -1,18 +1,21 @@
-"""Specifications for the recipe API endpoints (create/list/get/update/delete).
+"""Specifications for the recipe API endpoints (create from a link, create
+from photos, list/get/update/delete).
 
 Exercises the full HTTP stack via TestClient against the real Postgres test
-database. Scraping and AI extraction are stubbed — no real network or model
-calls are made — including the paths that map domain exceptions to
-user-facing (Portuguese) HTTP responses.
+database. Scraping, photo transcription and AI extraction are stubbed — no
+real network or model calls are made — including the paths that map domain
+exceptions to user-facing (Portuguese) HTTP responses.
 """
 
+import io
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 
 import pytest
 import pytest_asyncio
 from fastapi import Depends
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -23,6 +26,8 @@ from app.main import app
 from app.models.recipe import Recipe
 from app.schemas.recipe import IngredientExtraction, RecipeExtraction, StepExtraction
 from app.services.ai_extractor import AIRequestError, NotARecipeError
+from app.services.image_intake import MAX_IMAGES
+from app.services.image_transcriber import UnreadableImageError
 from app.services.recipe_service import RecipeService
 from app.services.scraper import UnreachableUrlError
 
@@ -41,6 +46,24 @@ async def _stub_scrape(url: str) -> str:
 
 async def _stub_extract(text: str) -> RecipeExtraction:
     return FAKE_EXTRACTION
+
+
+async def _stub_transcribe(images: Sequence[bytes]) -> str:
+    return "texto transcrito das fotos"
+
+
+def _jpeg_bytes() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (120, 90), color="white").save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def _photo_uploads(count: int = 1) -> list[tuple[str, tuple[str, bytes, str]]]:
+    """Multipart `files` entries, as the browser sends them."""
+    return [
+        ("files", (f"pagina{index + 1}.jpg", _jpeg_bytes(), "image/jpeg"))
+        for index in range(count)
+    ]
 
 
 async def _override_get_db_session() -> AsyncGenerator:
@@ -72,14 +95,20 @@ async def _clean_database_after_test() -> AsyncGenerator[None, None]:
 
 @pytest.fixture
 def make_client() -> Callable[..., TestClient]:
-    """Factory fixture: a TestClient with the recipe service's scrape/extract
-    replaced by the given stubs (defaults to a successful extraction)."""
+    """Factory fixture: a TestClient with the recipe service's
+    scrape/transcribe/extract replaced by the given stubs (defaults to a
+    successful extraction)."""
 
-    def _make(*, scrape: Callable = _stub_scrape, extract: Callable = _stub_extract) -> TestClient:
+    def _make(
+        *,
+        scrape: Callable = _stub_scrape,
+        transcribe: Callable = _stub_transcribe,
+        extract: Callable = _stub_extract,
+    ) -> TestClient:
         def override_get_recipe_service(
             session=Depends(get_db_session),
         ) -> RecipeService:
-            return RecipeService(session, scrape=scrape, extract=extract)
+            return RecipeService(session, scrape=scrape, transcribe=transcribe, extract=extract)
 
         app.dependency_overrides[get_db_session] = _override_get_db_session
         app.dependency_overrides[get_recipe_service] = override_get_recipe_service
@@ -109,6 +138,122 @@ def test_given_a_valid_url_when_posting_a_recipe_then_it_is_created_and_returned
     assert body["servings"] == 8
     assert body["ingredients"][0]["name"] == "cenoura"
     assert uuid.UUID(body["id"])
+
+
+def test_given_photos_of_a_recipe_when_posting_them_then_it_is_created_and_returned(
+    client: TestClient,
+) -> None:
+    """Given photos of a recipe, when POSTed to /api/recipes/image, then the
+    extracted recipe is persisted and returned — with no source_url, since
+    there is no page behind it, and marked as having come from images."""
+    response = client.post("/api/recipes/image", files=_photo_uploads(2))
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["title"] == "Bolo de cenoura"
+    assert body["ingredients"][0]["name"] == "cenoura"
+    assert body["source_url"] is None
+    assert body["source_type"] == "image"
+    assert uuid.UUID(body["id"])
+
+
+def test_given_recipes_from_both_links_and_photos_when_listing_then_they_come_back_together(
+    client: TestClient,
+) -> None:
+    """Given one recipe added from a link and another from photos, when
+    listing, then both appear in the same list — where a recipe came from
+    doesn't separate it from the others."""
+    client.post("/api/recipes", json={"url": "https://example.com/receita"})
+    client.post("/api/recipes/image", files=_photo_uploads())
+
+    response = client.get("/api/recipes")
+
+    assert response.status_code == 200
+    assert sorted(recipe["source_type"] for recipe in response.json()) == ["image", "link"]
+
+
+def test_given_no_photos_at_all_when_posting_then_returns_a_portuguese_error(
+    client: TestClient,
+) -> None:
+    """Given a submission with no files, when POSTed to /api/recipes/image,
+    then a 422 with a Portuguese, user-facing message is returned."""
+    response = client.post("/api/recipes/image", files=[])
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Envie pelo menos uma imagem da receita."
+
+
+def test_given_more_photos_than_allowed_when_posting_then_returns_a_portuguese_error(
+    client: TestClient,
+) -> None:
+    """Given more images than a single recipe allows, when POSTed to
+    /api/recipes/image, then a 422 with a Portuguese, user-facing message is
+    returned."""
+    response = client.post("/api/recipes/image", files=_photo_uploads(MAX_IMAGES + 1))
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == f"Envie no máximo {MAX_IMAGES} imagens por receita."
+
+
+def test_given_a_file_that_is_not_an_image_when_posting_then_returns_a_portuguese_error(
+    client: TestClient,
+) -> None:
+    """Given a PDF instead of a photo, when POSTed to /api/recipes/image,
+    then a 422 with a Portuguese, user-facing message naming the accepted
+    formats is returned."""
+    response = client.post(
+        "/api/recipes/image",
+        files=[("files", ("receita.pdf", b"%PDF-1.4", "application/pdf"))],
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Formato de imagem não suportado. Use JPG, PNG ou WebP."
+    )
+
+
+def test_given_the_photos_cannot_be_read_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the vision model gets no usable text out of the photos, when
+    POSTed to /api/recipes/image, then a 422 with a Portuguese, user-facing
+    message is returned and nothing is persisted."""
+
+    async def unreadable_transcribe(images: Sequence[bytes]) -> str:
+        raise UnreadableImageError("boom")
+
+    client = make_client(transcribe=unreadable_transcribe)
+
+    response = client.post("/api/recipes/image", files=_photo_uploads())
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não conseguimos ler o texto dessa imagem. Tente uma foto mais nítida, "
+        "com a receita bem enquadrada."
+    )
+    assert client.get("/api/recipes").json() == []
+
+
+def test_given_the_photos_are_not_a_recipe_when_posting_then_returns_a_portuguese_error(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the AI determines the photos show no recipe, when POSTed to
+    /api/recipes/image, then the same source-neutral rejection the link flow
+    produces is returned — one message that reads correctly for both."""
+
+    async def not_a_recipe_extract(text: str) -> RecipeExtraction:
+        raise NotARecipeError("a foto é de um cardápio")
+
+    client = make_client(extract=not_a_recipe_extract)
+
+    response = client.post("/api/recipes/image", files=_photo_uploads())
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Não encontramos uma receita aqui — não identificamos ingredientes "
+        "nem modo de preparo."
+    )
+    assert client.get("/api/recipes").json() == []
 
 
 def test_given_persisted_recipes_when_listing_then_returns_them(client: TestClient) -> None:
@@ -241,7 +386,8 @@ def test_given_the_source_is_not_a_recipe_when_posting_then_returns_a_portuguese
     """Given the AI determines the source page isn't a recipe (no
     ingredients or preparation steps), when POSTed to /api/recipes, then a
     422 with a Portuguese, user-facing message is returned and nothing is
-    persisted."""
+    persisted. The message is deliberately source-neutral: the same
+    rejection serves photos that turn out not to be recipes either."""
 
     async def not_a_recipe_extract(text: str) -> RecipeExtraction:
         raise NotARecipeError("a página é uma listagem de categorias")
@@ -252,8 +398,8 @@ def test_given_the_source_is_not_a_recipe_when_posting_then_returns_a_portuguese
 
     assert response.status_code == 422
     assert response.json()["detail"] == (
-        "Esse link não parece ser de uma receita — não encontramos ingredientes "
-        "nem modo de preparo na página."
+        "Não encontramos uma receita aqui — não identificamos ingredientes "
+        "nem modo de preparo."
     )
 
     listed = client.get("/api/recipes").json()

@@ -2,33 +2,52 @@ import { type CSSProperties, useEffect, useState } from 'react'
 import { MascotCooking } from './Mascot'
 
 /**
- * Extraction takes as long as it takes — an LLM reading a whole blog page.
- * A spinner would only say "something is happening"; naming the step the
- * mascot is actually on says *what*, which is what stops the wait from
- * reading as a freeze.
+ * Extraction takes as long as it takes — an LLM reading a whole blog page,
+ * or a vision model reading photographed pages. A spinner would only say
+ * "something is happening"; naming the step the mascot is actually on says
+ * *what*, which is what stops the wait from reading as a freeze.
+ *
+ * The two sources get their own captions because they really are doing
+ * different work: narrating "Abrindo o link…" over a photo upload would be
+ * describing something that isn't happening.
  */
-const STEPS = [
-  'Abrindo o link…',
-  'Pulando a história da vovó…',
-  'Separando os ingredientes…',
-  'Anotando o modo de preparo…',
-  'Conferindo tempos e porções…',
-  'Provando o tempero…',
-]
+const STEPS_BY_SOURCE = {
+  link: [
+    'Abrindo o link…',
+    'Pulando a história da vovó…',
+    'Separando os ingredientes…',
+    'Anotando o modo de preparo…',
+    'Conferindo tempos e porções…',
+    'Provando o tempero…',
+  ],
+  photos: [
+    'Olhando as fotos…',
+    'Decifrando a letra…',
+    'Separando os ingredientes…',
+    'Anotando o modo de preparo…',
+    'Conferindo tempos e porções…',
+    'Provando o tempero…',
+  ],
+} as const
 
 const STEP_MS = 2600
 
-export function CookingLoader() {
+interface CookingLoaderProps {
+  source?: keyof typeof STEPS_BY_SOURCE
+}
+
+export function CookingLoader({ source = 'link' }: CookingLoaderProps) {
   const [step, setStep] = useState(0)
+  const steps = STEPS_BY_SOURCE[source]
 
   useEffect(() => {
     // Holds on the last step instead of looping: a caption that restarts
     // tells the user the request restarted, which is a lie.
     const timer = setInterval(() => {
-      setStep((current) => Math.min(current + 1, STEPS.length - 1))
+      setStep((current) => Math.min(current + 1, steps.length - 1))
     }, STEP_MS)
     return () => clearInterval(timer)
-  }, [])
+  }, [steps.length])
 
   return (
     <div
@@ -44,7 +63,7 @@ export function CookingLoader() {
         key={step}
         className="caption-fade text-center font-display text-base font-extrabold tracking-[-0.01em] text-ink"
       >
-        {STEPS[step]}
+        {steps[step]}
       </p>
 
       {/* An azulejo rail rather than a progress bar: the wait is indefinite,

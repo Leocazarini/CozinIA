@@ -28,6 +28,24 @@ async function submitUrl(url: string) {
   await user.click(screen.getByRole('button', { name: 'Adicionar receita' }))
 }
 
+function photoNamed(name: string) {
+  // The bytes carry the name so the request can be checked by content:
+  // jsdom's FormData loses filenames on the way through fetch (every part
+  // arrives as "blob"), but the bytes survive intact.
+  return new File([`bytes-de-${name}`], name, { type: 'image/jpeg' })
+}
+
+async function choosePhotos(...names: string[]) {
+  const user = userEvent.setup()
+  await user.upload(screen.getByLabelText('Fotos da receita'), names.map(photoNamed))
+}
+
+async function submitPhotos(...names: string[]) {
+  const user = userEvent.setup()
+  await choosePhotos(...names)
+  await user.click(screen.getByRole('button', { name: 'Extrair das fotos' }))
+}
+
 describe('AddRecipe', () => {
   it('given a valid recipe link, when the extraction succeeds, then it shows a success message with the recipe title', async () => {
     server.use(
@@ -58,6 +76,88 @@ describe('AddRecipe', () => {
 
     expect(
       await screen.findByText('Não foi possível acessar o link informado.'),
+    ).toBeInTheDocument()
+  })
+
+  it('given photos of a recipe, when the extraction succeeds, then it shows the same success message as a link would', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/image`, () =>
+        HttpResponse.json(
+          buildRecipe({ title: 'Bolo da vovó', source_url: null, source_type: 'image' }),
+          { status: 201 },
+        ),
+      ),
+    )
+
+    renderAddRecipe()
+    await submitPhotos('pagina1.jpg', 'pagina2.jpg')
+
+    expect(await screen.findByText(/Bolo da vovó/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver receitas' })).toBeInTheDocument()
+  })
+
+  it('given a recipe spanning two photos, when the user submits, then both go up in a single request', async () => {
+    // Both pages in one call is the whole point: the vision model has to see
+    // them together to read one recipe out of two pages. Their *order* is
+    // specified where it can be observed — jsdom's FormData drops filenames
+    // and contents on the way through fetch (see tests/api/recipes.test.ts).
+    let requestCount = 0
+    let partCount = 0
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/image`, async ({ request }) => {
+        requestCount += 1
+        partCount = (await request.formData()).getAll('files').length
+        return HttpResponse.json(buildRecipe(), { status: 201 })
+      }),
+    )
+
+    renderAddRecipe()
+    await submitPhotos('pagina1.jpg', 'pagina2.jpg')
+
+    await screen.findByRole('link', { name: 'Ver receitas' })
+    expect(requestCount).toBe(1)
+    expect(partCount).toBe(2)
+  })
+
+  it('given no photo has been chosen, then the photo submit button is disabled', () => {
+    renderAddRecipe()
+
+    expect(screen.getByRole('button', { name: 'Extrair das fotos' })).toBeDisabled()
+  })
+
+  it('given several chosen photos, when the user removes one, then it is no longer listed', async () => {
+    const user = userEvent.setup()
+    renderAddRecipe()
+
+    await choosePhotos('pagina1.jpg', 'pagina2.jpg')
+    expect(screen.getByRole('button', { name: 'Remover foto 2' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remover foto 1' }))
+
+    expect(screen.queryByRole('button', { name: 'Remover foto 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remover foto 1' })).toBeInTheDocument()
+  })
+
+  it('given the photos are not a recipe, when the user submits, then it shows the API error message in Portuguese', async () => {
+    server.use(
+      http.post(`${API_BASE_URL}/api/recipes/image`, () =>
+        HttpResponse.json(
+          {
+            detail:
+              'Não encontramos uma receita aqui — não identificamos ingredientes nem modo de preparo.',
+          },
+          { status: 422 },
+        ),
+      ),
+    )
+
+    renderAddRecipe()
+    await submitPhotos('cardapio.jpg')
+
+    expect(
+      await screen.findByText(
+        'Não encontramos uma receita aqui — não identificamos ingredientes nem modo de preparo.',
+      ),
     ).toBeInTheDocument()
   })
 

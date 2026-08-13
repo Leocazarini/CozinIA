@@ -1,19 +1,25 @@
-"""Recipe endpoints: create (via AI extraction), list, retrieve, update, delete."""
+"""Recipe endpoints: create from a link or from photos (both via AI
+extraction), list, retrieve, update, delete."""
 
 import uuid
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
 from app.models.recipe import Recipe
 from app.schemas.recipe import CreateRecipeRequest, RecipeResponse, UpdateRecipeRequest
+from app.services.image_intake import MAX_BYTES_PER_IMAGE, prepare_images
 from app.services.recipe_service import RecipeService
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
 _NOT_FOUND_DETAIL = "Receita não encontrada."
+
+# Read one byte past the limit so an oversized upload is still detected when
+# it is truncated here rather than read whole into memory.
+_UPLOAD_READ_LIMIT = MAX_BYTES_PER_IMAGE + 1
 
 
 def get_recipe_service(session: AsyncSession = Depends(get_db_session)) -> RecipeService:
@@ -28,6 +34,25 @@ async def create_recipe(
 ) -> Recipe:
     """Extract a recipe from the given URL and persist it."""
     return await service.create_from_url(str(request.url))
+
+
+@router.post("/image", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
+async def create_recipe_from_images(
+    files: list[UploadFile] = File(default=[]),
+    service: RecipeService = Depends(get_recipe_service),
+) -> Recipe:
+    """Extract a recipe from uploaded photos and persist it.
+
+    The files are the pages of a single recipe, in the order sent. They are
+    only a source of text: nothing is stored beyond the recipe itself.
+
+    `files` defaults to an empty list rather than being required so that an
+    empty submission is answered with our own Portuguese message (via
+    NoImagesProvidedError) instead of FastAPI's generic validation error.
+    """
+    uploads = [(file.content_type, await file.read(_UPLOAD_READ_LIMIT)) for file in files]
+    images = prepare_images(uploads)
+    return await service.create_from_images(images)
 
 
 @router.get("", response_model=list[RecipeResponse])

@@ -2,9 +2,13 @@
 responses with user-facing (Portuguese) messages.
 
 Recipe-not-found is handled inline in the route (it's a routine, expected
-outcome); this module covers the ways the scrape/AI pipeline can fail —
-unexpected failures from external systems that bubble up from nested
-service calls.
+outcome); this module covers everything a recipe submission can fail on —
+a rejected photo upload, and the ways the scrape/transcribe/AI pipeline can
+fail on external systems, bubbling up from nested service calls.
+
+Keeping every one of these strings here (rather than at each raise site) is
+what makes the code-in-English / user-in-Portuguese split hold: this is the
+one file where the app speaks to the user.
 """
 
 from collections.abc import Callable, Coroutine
@@ -14,6 +18,14 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.services.ai_extractor import AIRequestError, MalformedAIResponseError, NotARecipeError
+from app.services.image_intake import (
+    MAX_IMAGES,
+    ImageTooLargeError,
+    NoImagesProvidedError,
+    TooManyImagesError,
+    UnsupportedImageTypeError,
+)
+from app.services.image_transcriber import UnreadableImageError
 from app.services.scraper import NoExtractableContentError, UnreachableUrlError
 
 _ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
@@ -25,10 +37,33 @@ _ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "Não encontramos uma receita no conteúdo dessa página.",
     ),
+    NoImagesProvidedError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Envie pelo menos uma imagem da receita.",
+    ),
+    TooManyImagesError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        f"Envie no máximo {MAX_IMAGES} imagens por receita.",
+    ),
+    UnsupportedImageTypeError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Formato de imagem não suportado. Use JPG, PNG ou WebP.",
+    ),
+    ImageTooLargeError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Imagem muito grande. O limite é 10 MB por foto.",
+    ),
+    UnreadableImageError: (
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "Não conseguimos ler o texto dessa imagem. Tente uma foto mais nítida, "
+        "com a receita bem enquadrada.",
+    ),
+    # Deliberately source-neutral: the same rejection has to read correctly
+    # whether the user pasted a link or uploaded a photo.
     NotARecipeError: (
         status.HTTP_422_UNPROCESSABLE_CONTENT,
-        "Esse link não parece ser de uma receita — não encontramos ingredientes "
-        "nem modo de preparo na página.",
+        "Não encontramos uma receita aqui — não identificamos ingredientes "
+        "nem modo de preparo.",
     ),
     AIRequestError: (
         status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -36,8 +71,7 @@ _ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
     ),
     MalformedAIResponseError: (
         status.HTTP_502_BAD_GATEWAY,
-        "Não foi possível interpretar a receita extraída desse link. "
-        "Tente novamente ou use outro link.",
+        "Não foi possível interpretar a receita extraída. Tente novamente.",
     ),
 }
 

@@ -11,14 +11,21 @@ from app.models.base import Base
 
 
 class Recipe(Base):
-    """A recipe extracted from a source URL and stored for later reading."""
+    """A recipe extracted from a source (a link or uploaded images) and
+    stored for later reading."""
 
     __tablename__ = "recipes"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    # Null for recipes extracted from images: there is no page to point back
+    # to. `source_type` is what says which of the two a recipe came from,
+    # instead of leaving that meaning implicit in a null.
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_type: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="link", default="link"
+    )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
