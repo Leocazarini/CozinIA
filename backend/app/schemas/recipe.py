@@ -98,6 +98,9 @@ class RecipeResponse(BaseModel):
     tags: list[str] | None = None
     ai_provider: str | None = None
     ai_model: str | None = None
+    # ISO 639-1 code of the language the recipe was originally in (e.g.
+    # "en"), or null when it was already Portuguese — see Recipe.source_language.
+    source_language: str | None = None
     created_at: datetime
     updated_at: datetime
 

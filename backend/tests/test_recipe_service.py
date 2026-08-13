@@ -21,6 +21,7 @@ from app.schemas.recipe import IngredientExtraction, RecipeExtraction, StepExtra
 from app.services.ai_extractor import AIRequestError, NotARecipeError
 from app.services.image_transcriber import UnreadableImageError
 from app.services.recipe_service import RecipeService
+from app.services.recipe_translator import TranslationResult
 from app.services.scraper import UnreachableUrlError
 from app.services.video_source import (
     NoVideoTextError,
@@ -46,6 +47,17 @@ FAKE_EXTRACTION = RecipeExtraction(
     steps=[StepExtraction(order=1, text="Bata tudo e leve ao forno.")],
 )
 
+# What a (stubbed) translation of FAKE_EXTRACTION would look like — a
+# different title is enough to prove the *translated* recipe is what gets
+# persisted, not the one AI extraction returned.
+TRANSLATED_EXTRACTION = RecipeExtraction(
+    title="Bolo de cenoura (traduzido)",
+    servings=8,
+    prep_time_minutes=15,
+    ingredients=[IngredientExtraction(name="cenoura", quantity="3", unit="unidades")],
+    steps=[StepExtraction(order=1, text="Bata tudo e leve ao forno.")],
+)
+
 
 async def _stub_scrape(url: str) -> str:
     return "texto extraído da página"
@@ -53,6 +65,10 @@ async def _stub_scrape(url: str) -> str:
 
 async def _stub_extract(text: str) -> RecipeExtraction:
     return FAKE_EXTRACTION
+
+
+async def _stub_translate(extraction: RecipeExtraction) -> TranslationResult:
+    return TranslationResult(extraction=TRANSLATED_EXTRACTION, source_language="en")
 
 
 async def _stub_transcribe(images: Sequence[bytes]) -> str:
@@ -140,6 +156,75 @@ async def test_given_a_video_link_when_creating_a_recipe_then_it_is_read_merged_
     assert recipe.raw_extracted_text == "receita montada a partir do vídeo"
     assert recipe.ai_provider == "openrouter"
     assert recipe.ai_model
+
+
+async def test_given_a_portuguese_extraction_when_creating_a_recipe_from_a_url_then_it_is_persisted_untranslated(
+    db_session: AsyncSession,
+) -> None:
+    """Given the extracted recipe is already in Portuguese, when creating a
+    recipe from a link, then the real (unstubbed) translation step runs,
+    detects it needs no translation, and the recipe is persisted exactly as
+    extracted, with no source_language recorded."""
+    service = RecipeService(db_session, scrape=_stub_scrape, extract=_stub_extract)
+
+    recipe = await service.create_from_url("https://example.com/receita")
+
+    assert recipe.title == "Bolo de cenoura"
+    assert recipe.source_language is None
+
+
+async def test_given_a_foreign_language_extraction_when_creating_a_recipe_from_a_url_then_the_translation_is_persisted(
+    db_session: AsyncSession,
+) -> None:
+    """Given the extracted recipe is in another language, when creating a
+    recipe from a link, then the translated recipe — not the one AI
+    extraction returned — is what gets persisted, tagged with the language
+    it was translated from."""
+    service = RecipeService(
+        db_session, scrape=_stub_scrape, extract=_stub_extract, translate=_stub_translate
+    )
+
+    recipe = await service.create_from_url("https://example.com/receita")
+
+    assert recipe.title == "Bolo de cenoura (traduzido)"
+    assert recipe.source_language == "en"
+
+
+async def test_given_a_foreign_language_extraction_when_creating_a_recipe_from_images_then_the_translation_is_persisted(
+    db_session: AsyncSession,
+) -> None:
+    """Given photos whose extracted recipe is in another language, when
+    creating a recipe from them, then the translated recipe is persisted —
+    the same translation step the link door uses, since both converge on
+    the same extraction."""
+    service = RecipeService(
+        db_session, transcribe=_stub_transcribe, extract=_stub_extract, translate=_stub_translate
+    )
+
+    recipe = await service.create_from_images([b"foto-pagina-1"])
+
+    assert recipe.title == "Bolo de cenoura (traduzido)"
+    assert recipe.source_language == "en"
+
+
+async def test_given_a_foreign_language_extraction_when_creating_a_recipe_from_a_video_then_the_translation_is_persisted(
+    db_session: AsyncSession,
+) -> None:
+    """Given a video whose extracted recipe is in another language, when
+    creating a recipe from it, then the translated recipe is persisted —
+    the same translation step the other two doors use."""
+    service = RecipeService(
+        db_session,
+        read_video=_stub_read_video,
+        transcribe_video=_stub_transcribe_video,
+        extract=_stub_extract,
+        translate=_stub_translate,
+    )
+
+    recipe = await service.create_from_video_url("https://www.youtube.com/watch?v=abc123")
+
+    assert recipe.title == "Bolo de cenoura (traduzido)"
+    assert recipe.source_language == "en"
 
 
 async def test_given_the_video_cannot_be_read_when_creating_a_recipe_then_the_error_propagates(

@@ -13,25 +13,37 @@ class Settings(BaseSettings):
     # No default credentials on purpose: a missing DATABASE_URL must fail
     # app startup loudly, never fall back to a known username/password.
     database_url: str
+
     # Only ever read by the test suite (never by the running app) — optional
     # here so the app itself doesn't need it to start; the test suite fails
     # clearly on its own if it's actually missing when tests run.
     test_database_url: str | None = None
     openrouter_api_key: str = ""
     ai_model: str = ""
+    
     # Separate from ai_model on purpose: reading recipe photos needs a
     # vision-capable model, and the model chosen for text extraction is not
     # necessarily one. Keeping them apart lets either be swapped alone.
     ai_vision_model: str = ""
+
     # Separate for the same reason: this one turns a video's noisy narration
     # plus its written description into one clean recipe document, which needs
     # stronger instruction-following on long, messy input than pulling fields
     # out of already-clean text does.
     ai_video_model: str = ""
+
     # Speech-to-text goes to OpenRouter's /audio/transcriptions endpoint,
     # which only accepts transcription models — a chat model is never valid
     # there, so this cannot share any of the vars above.
     ai_audio_model: str = ""
+
+    # Translates an already-extracted recipe into Brazilian Portuguese and
+    # converts its measurements to metric units. Separate from ai_model for
+    # the same reason as the others: it needs to follow a fairly long,
+    # detailed instruction (translate this, not that; convert these units,
+    # not those) rather than just pull fields out of clean text.
+    ai_translation_model: str = ""
+
     # Optional path to a Netscape cookies.txt handed to yt-dlp. Instagram and
     # TikTok are the platforms whose recipes are spoken rather than written —
     # exactly the ones that refuse anonymous requests from a datacenter IP.

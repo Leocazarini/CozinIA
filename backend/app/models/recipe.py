@@ -39,6 +39,11 @@ class Recipe(Base):
     raw_extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_provider: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ISO 639-1 code of the language the recipe was extracted in (e.g. "en"),
+    # set only when it wasn't already Portuguese — null covers both "it was
+    # already pt" and "couldn't tell", which don't need to be told apart
+    # here. See app/services/recipe_translator.py.
+    source_language: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

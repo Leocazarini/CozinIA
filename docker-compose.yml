@@ -26,6 +26,7 @@ services:
       AI_VISION_MODEL: ${AI_VISION_MODEL:-anthropic/claude-sonnet-5}
       AI_VIDEO_MODEL: ${AI_VIDEO_MODEL:-anthropic/claude-sonnet-5}
       AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
+      AI_TRANSLATION_MODEL: ${AI_TRANSLATION_MODEL:-anthropic/claude-sonnet-5}
       VIDEO_COOKIES_FILE: ${VIDEO_COOKIES_FILE:-}
     volumes:
       - ./backend/app:/app/app
@@ -86,6 +87,7 @@ services:
       # assert which model was called would compare "" to "" and pass vacuously.
       AI_VIDEO_MODEL: ${AI_VIDEO_MODEL:-anthropic/claude-sonnet-5}
       AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
+      AI_TRANSLATION_MODEL: ${AI_TRANSLATION_MODEL:-anthropic/claude-sonnet-5}
     depends_on:
       backend:
         condition: service_healthy
