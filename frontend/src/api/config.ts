@@ -1,27 +1,22 @@
-// Port the backend is published on by docker-compose.
-const BACKEND_PORT = 8000
-
 /**
- * Where the API lives, when nothing was configured explicitly.
+ * Where the API lives: the same origin that served the app.
  *
- * Derived from the address that served the page rather than hardcoded to
- * localhost: the browser reaches the backend on the same host it just
- * loaded the app from, only on a different port. Opening the app from a
- * phone at http://192.168.x.x:5173 therefore calls
- * http://192.168.x.x:8000 — where hardcoding "localhost" would make the
- * phone call *itself*, which is exactly the machine with no backend on it.
+ * Nothing about the backend's address is written down here, and that is the
+ * point. In production a reverse proxy publishes the built app at `/` and the
+ * backend at `/api` on one origin; in development the Vite server proxies the
+ * same two prefixes (see `vite.config.ts`). Either way the browser only ever
+ * talks to the host it loaded the page from.
  *
- * This also survives the LAN IP changing, which a value pinned in .env
- * does not.
+ * Being same-origin is what makes the app installable at all: a service worker
+ * needs a secure context, and an https page calling a plain-http backend on
+ * another port would be blocked as mixed content. It also means the LAN and
+ * the VPS run the identical build — only the certificate and the server name
+ * differ — and that no request ever needs CORS.
+ *
+ * VITE_API_URL stays as an escape hatch for pointing the frontend at a backend
+ * that is *not* behind the same proxy. Deliberately `||` and not `??`:
+ * docker-compose passes the variable through as an *empty string* when it is
+ * unset on the host, and `??` would take that empty string as a configured
+ * value — which happens to be the default anyway, but for the wrong reason.
  */
-function sameHostApiBaseUrl(): string {
-  const { protocol, hostname } = window.location
-  return `${protocol}//${hostname}:${BACKEND_PORT}`
-}
-
-// VITE_API_URL stays as an escape hatch for pointing the frontend at a
-// backend that is *not* on the same host (see docker-compose.yml).
-// Deliberately `||` and not `??`: docker-compose passes the variable
-// through as an *empty string* when it is unset on the host, and an empty
-// base URL would silently turn every API call into a relative one.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || sameHostApiBaseUrl()
+export const API_BASE_URL = import.meta.env.VITE_API_URL || ''

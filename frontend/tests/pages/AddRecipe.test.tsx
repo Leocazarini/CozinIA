@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_BASE_URL } from '../../src/api/config'
 import { AddRecipe } from '../../src/pages/AddRecipe'
 import { buildRecipe } from '../factories/recipe'
@@ -63,6 +63,14 @@ async function submitVideo(url: string) {
   await user.type(screen.getByLabelText('Link do vídeo'), url)
   await user.click(screen.getByRole('button', { name: 'Extrair do vídeo' }))
 }
+
+/** Takes the phone off the network, the way airplane mode would. */
+function goOffline() {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  fireEvent(window, new Event('offline'))
+}
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('AddRecipe', () => {
   it('given the page has just opened, then the three doors are offered as tabs, image first and selected', () => {
@@ -320,5 +328,56 @@ describe('AddRecipe', () => {
     await submitUrl('https://example.com/receita')
 
     expect(await screen.findByRole('button', { name: 'Extraindo receita…' })).toBeDisabled()
+  })
+
+  describe('on a phone', () => {
+    it('given the recipe is on the table, when a photo is taken with the camera, then it joins the ones picked from the gallery', async () => {
+      // The two ways in are both real: a cookbook open right now is a photo
+      // to take, a screenshot saved yesterday is a photo to pick.
+      const user = userEvent.setup()
+      renderAddRecipe()
+      await choosePhotos('pagina1.jpg')
+
+      await user.upload(screen.getByLabelText('Tirar foto'), photoNamed('pagina2.jpg'))
+
+      expect(screen.getByAltText('Foto 1 da receita')).toBeInTheDocument()
+      expect(screen.getByAltText('Foto 2 da receita')).toBeInTheDocument()
+    })
+
+    it('given the two ways of adding a photo, then only the camera one opens the camera', async () => {
+      // `capture` on the gallery input would *replace* the picker with the
+      // camera, taking away the saved screenshot case entirely — hence two
+      // inputs instead of one attribute.
+      renderAddRecipe()
+      await openTab('Imagem')
+
+      expect(screen.getByLabelText('Tirar foto')).toHaveAttribute('capture', 'environment')
+      expect(screen.getByLabelText('Fotos da receita')).not.toHaveAttribute('capture')
+    })
+
+    it('given the phone has no connection, when the page is open, then it says so and refuses to submit', async () => {
+      // Saved recipes still open offline (the service worker answers), but
+      // extracting a new one needs the server — without this the user would
+      // get a bare network error and no idea why.
+      renderAddRecipe()
+      await openTab('Link')
+
+      goOffline()
+
+      expect(screen.getByRole('status')).toHaveTextContent('Sem conexão')
+      expect(screen.getByRole('button', { name: 'Adicionar receita' })).toBeDisabled()
+    })
+
+    it('given the connection comes back, when it does, then the warning goes away and submitting works again', async () => {
+      renderAddRecipe()
+      await openTab('Link')
+      goOffline()
+
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      fireEvent(window, new Event('online'))
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Adicionar receita' })).toBeEnabled()
+    })
   })
 })

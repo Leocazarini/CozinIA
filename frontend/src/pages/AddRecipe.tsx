@@ -15,6 +15,7 @@ import { CookingLoader } from '../components/CookingLoader'
 import { MascotFilming, MascotLounging, MascotSnapping } from '../components/Mascot'
 import { CameraIcon, LinkIcon, Quatrefoil, VideoIcon } from '../components/icons'
 import { createRecipe, createRecipeFromImages, createRecipeFromVideo } from '../api/recipes'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 /**
  * A recipe can arrive as photos, as a video link, or as a link, and the
@@ -107,7 +108,9 @@ function DoorTabs({ open, onOpen }: { open: Door; onOpen: (door: Door) => void }
             onKeyDown={handleKeyDown}
             style={{ rotate: LEANS[index] }}
             className={[
-              'relative flex flex-1 items-center justify-center gap-1.5 rounded-[4px] border-2 py-2.5 font-display text-[0.7rem] font-extrabold tracking-[0.12em] uppercase transition-colors duration-150',
+              // min-h-11: a thumb's worth of tab (44px), which py-2.5 alone
+              // was 4px short of.
+              'relative flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[4px] border-2 py-2.5 font-display text-[0.7rem] font-extrabold tracking-[0.12em] uppercase transition-colors duration-150',
               isOpen
                 ? 'tile tile-flat tile-pressable border-ink bg-accent text-accent-ink'
                 : 'border-ink/25 bg-surface/55 text-ink-muted hover:border-ink hover:text-ink',
@@ -158,6 +161,7 @@ function MascotStage({
 }
 
 export function AddRecipe() {
+  const isOnline = useOnlineStatus()
   const [open, setOpen] = useState<Door>('photos')
   const [url, setUrl] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
@@ -249,6 +253,18 @@ export function AddRecipe() {
     <div className="flex flex-col gap-6">
       <DoorTabs open={open} onOpen={handleOpen} />
 
+      {/* The saved recipes still open with no signal — the service worker
+          answers with what was already read — so silence here would look
+          like the app simply not working. Reading is offline; extracting
+          is not, and only this screen has to say it. */}
+      {!isOnline && (
+        <p role="status" className="tile tile-keyline px-4 py-3 text-sm leading-relaxed text-ink">
+          <span className="font-display font-extrabold tracking-[0.06em]">Sem conexão.</span> As
+          receitas que você já abriu continuam aqui, mas para trazer uma nova eu preciso de
+          internet.
+        </p>
+      )}
+
       {/* Keyed by door so the panel drops onto the wall again on every
           switch, the same entrance every other tile makes. */}
       <div
@@ -300,6 +316,29 @@ export function AddRecipe() {
                     className="field w-full cursor-pointer px-4 py-3 text-sm file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-display file:text-xs file:font-extrabold file:tracking-[0.14em] file:text-accent file:uppercase"
                   />
                 </MascotStage>
+
+                {/* The other way in, for the book that is open on the counter
+                    right now. It needs an input of its own: `capture` on the
+                    picker above would replace it with the camera and take
+                    away the screenshot-saved-yesterday case. The input stays
+                    focusable (never `hidden`) so the keyboard can reach it —
+                    the label is only what it looks like. */}
+                <input
+                  id="recipe-camera"
+                  type="file"
+                  accept={ACCEPTED_PHOTO_TYPES}
+                  capture="environment"
+                  onChange={handleChoosePhotos}
+                  disabled={mutation.isPending}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="recipe-camera"
+                  className="tile tile-pressable inline-flex min-h-11 cursor-pointer items-center gap-2 self-start px-4 py-2 font-display text-[0.72rem] font-extrabold tracking-[0.14em] text-ink uppercase"
+                >
+                  <CameraIcon className="h-4 w-4" />
+                  Tirar foto
+                </label>
               </div>
 
               {photos.length > 0 && (
@@ -322,7 +361,10 @@ export function AddRecipe() {
                         onClick={() => handleRemovePhoto(index)}
                         disabled={mutation.isPending}
                         aria-label={`Remover foto ${index + 1}`}
-                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-accent font-display text-[0.7rem] font-extrabold text-accent-ink"
+                        // Same trick as the theme toggle: the badge stays
+                        // small so it doesn't cover the photo, while the
+                        // touchable area around it grows to a thumb's size.
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center border-2 border-ink bg-accent font-display text-[0.7rem] font-extrabold text-accent-ink after:absolute after:-inset-2.5 after:content-['']"
                       >
                         ×
                       </button>
@@ -331,7 +373,11 @@ export function AddRecipe() {
                 </ul>
               )}
 
-              <button type="submit" disabled={mutation.isPending || photos.length === 0} className={BUTTON_CLASS}>
+              <button
+                type="submit"
+                disabled={mutation.isPending || photos.length === 0 || !isOnline}
+                className={BUTTON_CLASS}
+              >
                 {mutation.isPending ? 'Lendo as fotos…' : 'Extrair das fotos'}
               </button>
             </form>
@@ -382,7 +428,11 @@ export function AddRecipe() {
                   />
                 </MascotStage>
               </div>
-              <button type="submit" disabled={mutation.isPending} className={BUTTON_CLASS}>
+              <button
+                type="submit"
+                disabled={mutation.isPending || !isOnline}
+                className={BUTTON_CLASS}
+              >
                 {mutation.isPending ? 'Assistindo o vídeo…' : 'Extrair do vídeo'}
               </button>
             </form>
@@ -433,7 +483,11 @@ export function AddRecipe() {
                   />
                 </MascotStage>
               </div>
-              <button type="submit" disabled={mutation.isPending} className={BUTTON_CLASS}>
+              <button
+                type="submit"
+                disabled={mutation.isPending || !isOnline}
+                className={BUTTON_CLASS}
+              >
                 {mutation.isPending ? 'Extraindo receita…' : 'Adicionar receita'}
               </button>
             </form>
