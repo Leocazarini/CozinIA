@@ -243,10 +243,10 @@ export function MascotDangling({ className }: MascotProps) {
             hangs below the line is the apron, its straps running up and
             vanishing into the gap. Tapered here, it would read as a sack
             on a hook. */}
-        <path d="M38 10C36 24 34 38 33 49Q33 54 38 54L82 54Q87 54 87 49C86 38 84 24 82 10Z" {...inked} />
-        <path d="M46 10L48 24M74 10L72 24" {...stroked} />
-        <path d="M46 30L74 30L74 39Q74 42 71 42L49 42Q46 42 46 39Z" {...inked} />
-        <Flour spots={[[41, 26, 1.5], [78, 35, 1.2], [60, 47, 1.1], [79, 18, 1]]} />
+        <path d="M41 10C39 24 38 38 37 49Q37 54 41 54L79 54Q83 54 83 49C82 38 81 24 79 10Z" {...inked} />
+        <path d="M47 10L48.5 24M73 10L71.5 24" {...stroked} />
+        <path d="M48 30L72 30L72 39Q72 42 69 42L51 42Q48 42 48 39Z" {...inked} />
+        <Flour spots={[[43, 26, 1.5], [76, 35, 1.2], [60, 47, 1.1], [75, 18, 1]]} />
         {/* One leg kicking out, one drawn up — the difference is what says
             the fall is being fought rather than accepted. */}
         <g className="legs-dangle">

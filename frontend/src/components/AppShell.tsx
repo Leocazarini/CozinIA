@@ -27,7 +27,7 @@ export function AppShell() {
           <Link to="/" className="flex items-center">
             <h1 className="flex items-center font-display text-[1.7rem] font-extrabold leading-none tracking-[-0.035em]">
               <span className="relative z-10">Cozin</span>
-              <span className="-ml-2.5 -rotate-3 rounded-[3px] border-2 border-ink bg-accent pt-1 pr-1.5 pb-0.5 pl-3 text-accent-ink shadow-[3px_3px_0_0_var(--color-emboss)]">
+              <span className="-ml-2 -rotate-3 rounded-[3px] border-2 border-ink bg-accent px-1.5 pt-1 pb-0.5 text-accent-ink shadow-[3px_3px_0_0_var(--color-emboss)]">
                 IA
               </span>
             </h1>
