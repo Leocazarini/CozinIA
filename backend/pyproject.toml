@@ -26,6 +26,10 @@ dependencies = [
     # breaks whenever a platform changes its player, and the fix is always to
     # upgrade, so rebuilding the image is routine maintenance for this feature.
     "yt-dlp>=2026.7",
+    # Detects the language a recipe was extracted in, offline and for free —
+    # see app/services/recipe_translator.py. Only decides *whether* to
+    # translate; the translation itself still goes through the AI.
+    "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]

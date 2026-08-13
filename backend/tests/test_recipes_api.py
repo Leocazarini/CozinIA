@@ -29,6 +29,7 @@ from app.services.ai_extractor import AIRequestError, NotARecipeError
 from app.services.image_intake import MAX_IMAGES
 from app.services.image_transcriber import UnreadableImageError
 from app.services.recipe_service import RecipeService
+from app.services.recipe_translator import TranslationResult, translate_if_needed
 from app.services.scraper import UnreachableUrlError
 from app.services.video_source import (
     MAX_VIDEO_DURATION_MINUTES,
@@ -79,6 +80,17 @@ async def _stub_read_video(url: str) -> VideoMaterial:
 
 async def _stub_transcribe_video(material: VideoMaterial) -> str:
     return "receita montada a partir do vídeo"
+
+
+async def _stub_translate_from_english(extraction: RecipeExtraction) -> TranslationResult:
+    translated = RecipeExtraction(
+        title="Bolo de cenoura (traduzido)",
+        servings=extraction.servings,
+        prep_time_minutes=extraction.prep_time_minutes,
+        ingredients=extraction.ingredients,
+        steps=extraction.steps,
+    )
+    return TranslationResult(extraction=translated, source_language="en")
 
 
 def _jpeg_bytes() -> bytes:
@@ -135,6 +147,7 @@ def make_client() -> Callable[..., TestClient]:
         read_video: Callable = _stub_read_video,
         transcribe_video: Callable = _stub_transcribe_video,
         extract: Callable = _stub_extract,
+        translate: Callable = translate_if_needed,
     ) -> TestClient:
         def override_get_recipe_service(
             session=Depends(get_db_session),
@@ -146,6 +159,7 @@ def make_client() -> Callable[..., TestClient]:
                 read_video=read_video,
                 transcribe_video=transcribe_video,
                 extract=extract,
+                translate=translate,
             )
 
         app.dependency_overrides[get_db_session] = _override_get_db_session
@@ -210,6 +224,36 @@ def test_given_a_video_link_when_posting_it_then_the_recipe_is_created_and_retur
     assert body["source_url"] == VIDEO_URL
     assert body["source_type"] == "video"
     assert uuid.UUID(body["id"])
+
+
+def test_given_a_recipe_already_in_portuguese_when_posting_then_source_language_is_null(
+    client: TestClient,
+) -> None:
+    """Given the extracted recipe is already in Portuguese, when POSTed to
+    /api/recipes, then the response carries no source_language — nothing was
+    translated because nothing needed to be."""
+    response = client.post("/api/recipes", json={"url": "https://example.com/receita"})
+
+    assert response.status_code == 201
+    assert response.json()["source_language"] is None
+
+
+def test_given_a_recipe_in_another_language_when_posting_then_the_translated_recipe_is_returned(
+    make_client: Callable[..., TestClient],
+) -> None:
+    """Given the extracted recipe is in another language, when POSTed to
+    /api/recipes, then the response carries the translated recipe — not the
+    one AI extraction returned — along with the language it was translated
+    from. Only the link door is exercised here: the translation step itself,
+    and that all three doors share it, are specified in test_recipe_service.py."""
+    client = make_client(translate=_stub_translate_from_english)
+
+    response = client.post("/api/recipes", json={"url": "https://example.com/receita"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["title"] == "Bolo de cenoura (traduzido)"
+    assert body["source_language"] == "en"
 
 
 def test_given_recipes_from_links_photos_and_videos_when_listing_then_they_come_back_together(
