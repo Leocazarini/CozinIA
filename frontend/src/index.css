@@ -276,6 +276,23 @@ body::before {
   animation: steam-flow 1.3s linear infinite;
 }
 
+/* The hanging body swinging from the line it holds on to. Slower than the
+   legs below it, so the two compose instead of marching in step. */
+@keyframes body-swing {
+  from {
+    transform: rotate(-2.6deg);
+  }
+  to {
+    transform: rotate(2.6deg);
+  }
+}
+
+.body-swing {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: body-swing 4.6s ease-in-out infinite alternate;
+}
+
 /* Lower legs swinging gently behind the header line. One group, one
    motion — legs animated separately read as flailing. */
 @keyframes legs-dangle {
@@ -436,6 +453,7 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .tile-drop,
   .tile-bob,
+  .body-swing,
   .legs-dangle,
   .mascot-breathe,
   .steam-flow,

@@ -220,54 +220,50 @@ function Ticks({ x, y, flip = 1 }: { x: number; y: number; flip?: number }) {
 }
 
 /**
- * Pose one — Home. Lying belly-down along the header's bottom rule like a
- * kid on a wall: forearm folded on the line, head hanging over the edge
- * tilted down at the recipe list, hips curving over the "beam" with the
- * apron bow on the back, and the lower legs dangling on the far side.
+ * Pose one — Home. Hanging off the header's bottom rule: both forearms
+ * hooked over the line, the pot resting on it and tipped down at the
+ * recipe list, and the whole body swinging underneath with the legs
+ * kicking — someone who slipped and has not fallen yet.
  *
  * The behind-the-line illusion is a transparent window in the artwork:
  * nothing is drawn between y=0 and y=9.5, and the page positions the SVG
  * so the header's real 2px border and 6px frieze show through exactly
- * there — the legs resume below it, visibly "behind" the line. That is
- * also why this pose must stay compact above the line: the header is only
- * ~58px tall, and anything taller would poke out of the viewport.
+ * there. The neck and both shoulders live in that gap, which is what lets
+ * the body read as hanging *from* the line rather than being glued to it.
+ * That is also why the head has to stay compact above it: the header is
+ * only ~58px tall, and anything taller would poke out of the viewport.
  */
-export function MascotPerched({ className }: MascotProps) {
+export function MascotDangling({ className }: MascotProps) {
   return (
-    <svg className={className} viewBox="0 -66 140 99" fill="none" aria-hidden="true" focusable="false">
-      <g className="legs-dangle">
-        <Limb d="M100 9.5 C99 15 97.5 20 95.5 24.5" />
-        <Boot x={91} y={26} />
-        <Limb d="M111 9.5 C111.5 14 112 18 113 21.5" />
-        <Boot x={116} y={23} rotate={8} flip />
-        <Flour spots={[[98, 17, 1.1]]} />
+    <svg className={className} viewBox="0 -54 120 131" fill="none" aria-hidden="true" focusable="false">
+      {/* Everything below the line swings from where it hangs. */}
+      <g className="body-swing">
+        {/* Widest at the hem instead of tapering to shoulders the way the
+            standing torso does: the shoulders are behind the rule, so what
+            hangs below the line is the apron, its straps running up and
+            vanishing into the gap. Tapered here, it would read as a sack
+            on a hook. */}
+        <path d="M38 10C36 24 34 38 33 49Q33 54 38 54L82 54Q87 54 87 49C86 38 84 24 82 10Z" {...inked} />
+        <path d="M46 10L48 24M74 10L72 24" {...stroked} />
+        <path d="M46 30L74 30L74 39Q74 42 71 42L49 42Q46 42 46 39Z" {...inked} />
+        <Flour spots={[[41, 26, 1.5], [78, 35, 1.2], [60, 47, 1.1], [79, 18, 1]]} />
+        {/* One leg kicking out, one drawn up — the difference is what says
+            the fall is being fought rather than accepted. */}
+        <g className="legs-dangle">
+          <Limb d="M52 51C49 58 47 64 46 69" />
+          <Boot x={44} y={71} />
+          <Limb d="M68 51C73 56 75 61 72 65" />
+          <Boot x={70} y={67} rotate={22} flip />
+        </g>
       </g>
 
-      <g className="mascot-breathe">
-        {/* Back and hip, resting on the line. */}
-        <path
-          d="M58 -22 C74 -26 90 -24 99 -17 C105 -12 106.5 -6 104.5 -1.5 L58 -1.5 C54 -8 54 -16 58 -22 Z"
-          {...inked}
-        />
-        {/* Apron strap across the back, tied in a bow at the hip. */}
-        <path d="M64 -21.5 C74 -24.5 85 -23.6 93 -20.4" fill="none" stroke={TILE} strokeWidth="2" strokeLinecap="round" />
-        <path d="M95 -20.5 C91 -26 85.5 -24 88.5 -19.6 C90 -17.6 92.8 -18.2 95 -20.5 Z" {...inked} />
-        <path d="M95 -20.5 C99 -26 104.5 -24 101.5 -19.6 C100 -17.6 97.2 -18.2 95 -20.5 Z" {...inked} />
-        <path
-          d="M93.5 -19 C92.5 -15 91 -12 88.5 -10 M97 -19 C97.5 -15 98.5 -12 100.5 -9.5"
-          fill="none"
-          stroke={TILE}
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <Flour spots={[[72, -14, 1.5], [88, -9, 1.2], [63, -7, 1]]} />
+      {/* Forearms first so the pot covers where they meet the shoulders. */}
+      <Limb d="M52 -3C42 -8 32 -8 24 -5" />
+      <FlatHand x={23} y={-2} rotate={7} />
+      <Limb d="M68 -3C78 -8 88 -8 96 -5" />
+      <FlatHand x={97} y={-2} rotate={-7} flip />
 
-        {/* The elbow-prop: forearm folded flat along the line. */}
-        <Limb d="M56 -4.5 C48 -5.5 40 -5.5 31 -4.8" />
-        <FlatHand x={28.5} y={-1.2} />
-
-        <PotHead cx={48} lidY={-47.3} tilt={-15} shortSteam />
-      </g>
+      <PotHead cx={60} lidY={-36} tilt={-10} shortSteam />
     </svg>
   )
 }
