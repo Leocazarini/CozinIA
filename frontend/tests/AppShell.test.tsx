@@ -2,17 +2,20 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
+import { AuthProvider } from '../src/auth/AuthContext'
 import { AppShell } from '../src/components/AppShell'
 
 function renderShell(path = '/pagina') {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path={path} element={<p>conteúdo da página</p>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path={path} element={<p>conteúdo da página</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   )
 }
 
@@ -33,13 +36,15 @@ describe('AppShell', () => {
 
   it('given the app shell is rendered, when it loads, then it shows navigation links to Home and Adicionar receita', () => {
     render(
-      <MemoryRouter initialEntries={['/']}>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<p>home</p>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
     )
 
     expect(screen.getByRole('link', { name: 'Receitas' })).toBeInTheDocument()

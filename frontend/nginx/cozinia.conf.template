@@ -2,7 +2,19 @@
 #
 # ${WEB_SERVER_NAME} and the two certificate paths are substituted by the
 # nginx image's entrypoint at boot — they are the only things that differ
-# between the LAN (a locally generated CA) and the VPS (Let's Encrypt).
+# between the LAN (a locally generated CA) and the VPS (Cloudflare Origin
+# Certificate / Let's Encrypt).
+
+# Cap how fast one address can hit the API and how many slow connections it can
+# hold at once — a second layer under the backend's own per-user rate limiting.
+# The rates are generous (normal use is far below them); they only catch a
+# flood. Behind Cloudflare, $binary_remote_addr is the edge address, so keep
+# these coarse and let the backend do the precise per-user limiting.
+limit_req_zone $binary_remote_addr zone=api_rl:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=api_conn:10m;
+
+# Don't advertise the exact nginx version on every response and error page.
+server_tokens off;
 
 # Plain http exists only to send phones to https: a service worker will not
 # register without a secure context, so the app is not an app over http.
@@ -12,7 +24,10 @@ server {
     server_name ${WEB_SERVER_NAME};
 
     location / {
-        return 308 https://$host$request_uri;
+        # $server_name, never $host: redirecting to the client-supplied Host
+        # would turn this into an open redirect (a phishing hop that starts at
+        # our address). This always sends the browser to our own name.
+        return 308 https://$server_name$request_uri;
     }
 }
 
@@ -25,7 +40,17 @@ server {
     ssl_certificate ${TLS_CERT_FILE};
     ssl_certificate_key ${TLS_KEY_FILE};
     ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
     ssl_session_cache shared:SSL:2m;
+    ssl_session_timeout 1d;
+    # No session tickets: without a rotation mechanism they undermine forward
+    # secrecy across restarts.
+    ssl_session_tickets off;
+
+    # Security headers, applied here and re-included in every location that sets
+    # its own add_header (see the snippet's own comment for why that is needed).
+    include /etc/nginx/snippets/security-headers.conf;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -49,11 +74,21 @@ server {
     set $backend http://backend:8000;
 
     location /api/ {
+        # Flood protection (see the zones above). burst absorbs a normal spike;
+        # nodelay serves the burst immediately rather than queuing it.
+        limit_req zone=api_rl burst=40 nodelay;
+        limit_conn api_conn 20;
+
         proxy_pass $backend$request_uri;
-        proxy_set_header Host $host;
+        # Fixed, not $host: the backend pins its own trusted hosts and never
+        # needs the client-supplied Host, so don't forward an attacker's.
+        proxy_set_header Host $server_name;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Pass Cloudflare's real-client header through so the backend's rate
+        # limiter keys on the actual user, not the edge.
+        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
 
         # The video door is the longest request in the app — metadata,
         # audio download, speech-to-text, then two model passes — and
@@ -68,7 +103,7 @@ server {
 
     location = /health {
         proxy_pass $backend$request_uri;
-        proxy_set_header Host $host;
+        proxy_set_header Host $server_name;
         access_log off;
     }
 
@@ -79,6 +114,7 @@ server {
         types { }
         default_type application/manifest+json;
         add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # The service worker and the entry point must never be served stale, or
@@ -86,12 +122,14 @@ server {
     # bundles, and sw.js decides when to fetch a new one.
     location ~* ^/(index\.html|sw\.js|registerSW\.js)$ {
         add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # Everything under /assets carries a content hash in its name, so it can
     # never go stale — a changed file is a different URL.
     location /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # Client-side routes (/adicionar, /recipes/:id) have no file behind them.

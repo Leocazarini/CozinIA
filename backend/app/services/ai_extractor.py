@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Cap how long one extraction may hold a worker. The OpenAI SDK defaults to 600
+# seconds — longer than any browser, proxy or person waits — so without this a
+# slow provider response could pin a worker for ten minutes (and, chained with
+# translation, twenty). Matches the intent of the timeouts on the video and
+# audio transcription calls.
+_AI_REQUEST_TIMEOUT_SECONDS = 120.0
+
 _SYSTEM_PROMPT = (
     "You extract recipe data from webpage text. Read the provided text and decide whether it "
     "actually describes a recipe with identifiable ingredients and preparation steps.\n\n"
@@ -84,6 +91,7 @@ async def extract_recipe(text: str, *, client: AsyncOpenAI | None = None) -> Rec
                 {"role": "user", "content": text},
             ],
             response_format=RecipeExtractionOutcome,
+            timeout=_AI_REQUEST_TIMEOUT_SECONDS,
         )
     except (LengthFinishReasonError, ContentFilterFinishReasonError) as error:
         raise MalformedAIResponseError(f"AI response was not usable: {error}") from error

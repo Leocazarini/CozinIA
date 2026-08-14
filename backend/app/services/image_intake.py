@@ -18,6 +18,15 @@ MAX_BYTES_PER_IMAGE = 10 * 1024 * 1024
 MAX_LONG_EDGE_PIXELS = 1568
 ACCEPTED_CONTENT_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
+# A decompression bomb is a tiny file whose header claims enormous dimensions
+# (e.g. 30000x30000 = 900 MP): it slips past the byte-size check yet would
+# explode to gigabytes of RAM on decode. This caps the pixel count we will
+# decode — set well above any real photo (a 108 MP phone shot is far larger in
+# bytes than the 10 MB cap anyway) but far below a bomb. Applied to Pillow's
+# own global guard as a second line, and checked explicitly before decode.
+_MAX_TOTAL_PIXELS = 100_000_000
+Image.MAX_IMAGE_PIXELS = _MAX_TOTAL_PIXELS
+
 _JPEG_QUALITY = 85
 
 
@@ -71,10 +80,21 @@ def _prepare_one(content_type: str | None, data: bytes) -> bytes:
 
     try:
         image = Image.open(io.BytesIO(data))
+        # Image.open only reads the header, so .size is known before any pixels
+        # are decoded — reject a bomb here, cheaply, before load() would try to
+        # allocate for it.
+        width, height = image.size
+        if width * height > _MAX_TOTAL_PIXELS:
+            raise UnsupportedImageTypeError(
+                f"Image claims {width}x{height} pixels, over the {_MAX_TOTAL_PIXELS} limit"
+            )
         image.load()
-    except (UnidentifiedImageError, OSError, ValueError) as error:
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as error:
         # The declared content type is client-supplied, so bytes that don't
-        # actually decode land here rather than at the check above.
+        # actually decode — and headers that claim bomb-sized dimensions — land
+        # here rather than at the check above. DecompressionBombError is not an
+        # OSError/ValueError subclass, so it must be named explicitly or it
+        # would escape as an unhandled 500.
         raise UnsupportedImageTypeError(f"Could not decode the uploaded image: {error}") from error
 
     return _to_downscaled_jpeg(image)

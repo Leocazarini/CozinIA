@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 import { BottomNav } from './BottomNav'
+import { LogOutIcon } from './icons'
 import { MascotDangling } from './Mascot'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -13,6 +15,7 @@ import { ThemeToggle } from './ThemeToggle'
  */
 export function AppShell() {
   const isRecipeList = useLocation().pathname === '/'
+  const { signOut } = useAuth()
 
   return (
     <div className="flex min-h-dvh flex-col text-ink">
@@ -40,7 +43,17 @@ export function AppShell() {
             </h1>
           </Link>
 
-          <ThemeToggle />
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              onClick={signOut}
+              aria-label="Sair da conta"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] border-2 border-transparent text-ink-muted transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:border-ink hover:bg-surface hover:text-ink"
+            >
+              <LogOutIcon className="h-5 w-5" />
+            </button>
+            <ThemeToggle />
+          </div>
 
           {/* The mascot hangs off the header's bottom rule, over the recipe
               list. The numbers are load-bearing: the SVG renders at 106px

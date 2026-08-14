@@ -16,7 +16,9 @@ dependencies = [
     "lxml>=5.0",
     "openai>=1.55",
     # FastAPI raises at import time if UploadFile/File is declared without it.
-    "python-multipart>=0.0.9",
+    # Floor at 0.0.18: earlier versions carry a multipart-parsing DoS
+    # (CVE-2024-53981). A clean build must never resolve below this.
+    "python-multipart>=0.0.18",
     # Decodes and downscales uploaded recipe photos before they go to the
     # vision model (see app/services/image_intake.py).
     "pillow>=11.0",
@@ -30,6 +32,15 @@ dependencies = [
     # see app/services/recipe_translator.py. Only decides *whether* to
     # translate; the translation itself still goes through the AI.
     "langdetect>=1.0.9",
+    # Signs and verifies the login tokens (see app/services/auth_service.py).
+    "pyjwt>=2.10",
+    # Hashes account passwords with Argon2 — the modern, memory-hard default,
+    # so a stolen database of hashes is expensive to crack (see
+    # app/services/auth_service.py).
+    "pwdlib[argon2]>=0.2.1",
+    # Slows down and caps abusive callers so an anonymous loop can't drain the
+    # OpenRouter credits or pin every worker (see app/main.py).
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]
@@ -64,3 +75,7 @@ ignore = ["B008"]
 # E501: the given/when/then test naming convention (see docs/TESTING.md)
 # intentionally produces long, descriptive names — that's the point.
 "tests/*" = ["E501"]
+# E402: conftest must set JWT_SECRET in the environment (and disable the rate
+# limiter) before importing anything that constructs Settings, so a handful of
+# imports deliberately sit below that setup.
+"tests/conftest.py" = ["E402"]

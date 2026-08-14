@@ -7,13 +7,26 @@ import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
+# The app refuses to start without a JWT_SECRET (see app/core/config.py). Tests
+# never verify a real token's signature against a real secret, so any value
+# does — set one before importing anything that constructs Settings. A real
+# environment variable overrides this, so a deploy still uses its own secret.
+os.environ.setdefault("JWT_SECRET", "test-secret-not-used-in-production")
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
+
+# Rate limiting is stateful and keyed on the (shared) test client address, so
+# leaving it on would make unrelated tests trip each other's limits. Off by
+# default here; the tests that specifically exercise it turn it back on.
+limiter.enabled = False
 from app.models.base import Base
 from app.models.recipe import Recipe  # noqa: F401 - registers the table on Base.metadata
+from app.models.user import User  # noqa: F401 - registers the table on Base.metadata
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 

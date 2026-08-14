@@ -13,7 +13,7 @@ from app.models.base import Base
 
 # Import every model module so its table registers on Base.metadata before
 # autogenerate compares it against the database.
-from app.models import recipe  # noqa: F401
+from app.models import recipe, user  # noqa: F401
 
 config = context.config
 

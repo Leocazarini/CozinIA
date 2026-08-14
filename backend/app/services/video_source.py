@@ -56,6 +56,11 @@ _MAX_TRANSCRIPT_CHARACTERS = 35_000
 # automatic track is around 500 KB of rolling-window repetition, so this only
 # catches a broken or hostile file.
 _MAX_CAPTION_CHARACTERS = 1_000_000
+# A hard byte cap on the downloaded caption body, checked before it is decoded
+# to text: the caption url comes from yt-dlp's metadata (third-party), so a
+# hostile or broken track can't stream gigabytes into memory before the
+# character truncation above ever runs.
+_MAX_CAPTION_BYTES = 5 * 1024 * 1024
 _TRUNCATION_MARKER = "\n[... transcript truncated ...]"
 
 _SOCKET_TIMEOUT_SECONDS = 15
@@ -457,6 +462,10 @@ async def _read_captions(
             response.raise_for_status()
     except httpx.HTTPError as error:
         logger.warning("Could not download the caption track: %s", error)
+        return None, None
+
+    if len(response.content) > _MAX_CAPTION_BYTES:
+        logger.warning("Caption track exceeds %d bytes, ignoring it", _MAX_CAPTION_BYTES)
         return None, None
 
     transcript = transcript_from_vtt(response.text[:_MAX_CAPTION_CHARACTERS])

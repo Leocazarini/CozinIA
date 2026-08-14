@@ -78,10 +78,17 @@ export const pwaOptions: Partial<VitePWAOptions> = {
         // by destination rather than by extension because plenty of those
         // URLs end in a query string, or in nothing at all.
         urlPattern: ({ request, sameOrigin }) => !sameOrigin && request.destination === 'image',
-        handler: 'CacheFirst',
+        // StaleWhileRevalidate, not CacheFirst: a CacheFirst entry pins a
+        // third-party image for its whole lifetime, so a changed or
+        // compromised URL would keep serving the old bytes; this refreshes it
+        // in the background instead. maxEntries kept modest because opaque
+        // cross-origin responses (status 0) are padded to several MB each in
+        // the browser's quota accounting, so a large cap could evict the
+        // precached app shell and break offline use.
+        handler: 'StaleWhileRevalidate',
         options: {
           cacheName: 'cozinia-recipe-images',
-          expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+          expiration: { maxEntries: 25, maxAgeSeconds: 60 * 60 * 24 * 7 },
           // Cross-origin images fetched no-cors come back opaque, with
           // status 0. Accepting only 200 would cache none of them.
           cacheableResponse: { statuses: [0, 200] },
