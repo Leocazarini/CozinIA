@@ -14,6 +14,22 @@ class Settings(BaseSettings):
     # app startup loudly, never fall back to a known username/password.
     database_url: str
 
+    # Signs and verifies login tokens. No default, for the same reason as
+    # database_url: a predictable key would let anyone forge a valid session,
+    # so a missing JWT_SECRET must stop the app from starting rather than fall
+    # back to something guessable. Generate one with `openssl rand -hex 32`.
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+    # How long a login stays valid. A week keeps an installed PWA from asking
+    # for the password on every use, while still expiring an old token.
+    access_token_ttl_minutes: int = 60 * 24 * 7
+
+    # The exact browser origin allowed to call the API (CORS). In production
+    # this is the app's own https origin; left unset in dev, where the frontend
+    # reaches the API same-origin through the Vite/nginx proxy and a small set
+    # of localhost origins is allowed instead. Never a wildcard.
+    allowed_origin: str | None = None
+
     # Only ever read by the test suite (never by the running app) — optional
     # here so the app itself doesn't need it to start; the test suite fails
     # clearly on its own if it's actually missing when tests run.

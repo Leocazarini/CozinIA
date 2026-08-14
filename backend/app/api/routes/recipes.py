@@ -1,19 +1,33 @@
 """Recipe endpoints: create from a link, from photos, or from a video link
 (all three via AI extraction), list, retrieve, update, delete."""
 
+import asyncio
 import uuid
 from collections.abc import Sequence
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db_session
+from app.core.rate_limit import CREATE_RECIPE_LIMIT, limiter
+from app.core.security import get_current_user
 from app.models.recipe import Recipe
 from app.schemas.recipe import CreateRecipeRequest, RecipeResponse, UpdateRecipeRequest
-from app.services.image_intake import MAX_BYTES_PER_IMAGE, prepare_images
+from app.services.image_intake import (
+    MAX_BYTES_PER_IMAGE,
+    MAX_IMAGES,
+    TooManyImagesError,
+    prepare_images,
+)
 from app.services.recipe_service import RecipeService
 
-router = APIRouter(prefix="/api/recipes", tags=["recipes"])
+# Every route here requires a valid login token: the recipe library is private
+# to the app's accounts. /health and /api/auth/login are the only public doors.
+router = APIRouter(
+    prefix="/api/recipes",
+    tags=["recipes"],
+    dependencies=[Depends(get_current_user)],
+)
 
 _NOT_FOUND_DETAIL = "Receita não encontrada."
 
@@ -28,16 +42,24 @@ def get_recipe_service(session: AsyncSession = Depends(get_db_session)) -> Recip
 
 
 @router.post("", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(CREATE_RECIPE_LIMIT)
 async def create_recipe(
-    request: CreateRecipeRequest,
+    request: Request,
+    payload: CreateRecipeRequest,
     service: RecipeService = Depends(get_recipe_service),
 ) -> Recipe:
-    """Extract a recipe from the given URL and persist it."""
-    return await service.create_from_url(str(request.url))
+    """Extract a recipe from the given URL and persist it.
+
+    `request` is required by the rate limiter that caps how often this
+    money-spending endpoint can be called from one caller.
+    """
+    return await service.create_from_url(str(payload.url))
 
 
 @router.post("/image", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(CREATE_RECIPE_LIMIT)
 async def create_recipe_from_images(
+    request: Request,
     files: list[UploadFile] = File(default=[]),
     service: RecipeService = Depends(get_recipe_service),
 ) -> Recipe:
@@ -49,15 +71,26 @@ async def create_recipe_from_images(
     `files` defaults to an empty list rather than being required so that an
     empty submission is answered with our own Portuguese message (via
     NoImagesProvidedError) instead of FastAPI's generic validation error.
+
+    `request` is required by the rate limiter on this money-spending endpoint.
     """
+    # Reject an over-count *before* reading any file into memory: otherwise a
+    # single request with hundreds of files would spool gigabytes to memory
+    # and disk before prepare_images ever gets to complain about the number.
+    if len(files) > MAX_IMAGES:
+        raise TooManyImagesError(f"{len(files)} images sent, max is {MAX_IMAGES}")
     uploads = [(file.content_type, await file.read(_UPLOAD_READ_LIMIT)) for file in files]
-    images = prepare_images(uploads)
+    # Pillow decode + resize is CPU-bound and blocks the event loop; hand it to
+    # a worker thread so one big upload can't freeze every other request.
+    images = await asyncio.to_thread(prepare_images, uploads)
     return await service.create_from_images(images)
 
 
 @router.post("/video", response_model=RecipeResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(CREATE_RECIPE_LIMIT)
 async def create_recipe_from_video(
-    request: CreateRecipeRequest,
+    request: Request,
+    payload: CreateRecipeRequest,
     service: RecipeService = Depends(get_recipe_service),
 ) -> Recipe:
     """Extract a recipe from the given video link and persist it.
@@ -66,8 +99,10 @@ async def create_recipe_from_video(
     as a video: its description and its narration, rather than the text of a
     page. Which door a link goes through is the user's choice, not something
     guessed from the host.
+
+    `request` is required by the rate limiter on this money-spending endpoint.
     """
-    return await service.create_from_video_url(str(request.url))
+    return await service.create_from_video_url(str(payload.url))
 
 
 @router.get("", response_model=list[RecipeResponse])
