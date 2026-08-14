@@ -93,6 +93,15 @@ export function SearchIcon({ className }: IconProps) {
   )
 }
 
+export function LogOutIcon({ className }: IconProps) {
+  return (
+    <svg className={className} {...sharedProps}>
+      <path d="M14 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H14" />
+      <path d="M17 8.5 20.5 12 17 15.5M20 12H10" />
+    </svg>
+  )
+}
+
 /**
  * The four-petal rosette at the centre of the azulejo tile, reused as a
  * standalone ornament to close panels and mark empty states.
