@@ -22,8 +22,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.api.routes.recipes import get_recipe_service
 from app.core.config import get_settings
 from app.core.db import get_db_session
+from app.core.security import get_current_user
 from app.main import app
 from app.models.recipe import Recipe
+from app.models.user import User
 from app.schemas.recipe import IngredientExtraction, RecipeExtraction, StepExtraction
 from app.services.ai_extractor import AIRequestError, NotARecipeError
 from app.services.image_intake import MAX_IMAGES
@@ -164,6 +166,10 @@ def make_client() -> Callable[..., TestClient]:
 
         app.dependency_overrides[get_db_session] = _override_get_db_session
         app.dependency_overrides[get_recipe_service] = override_get_recipe_service
+        # The recipe routes now require a login; stand in an authenticated user
+        # so these tests exercise the endpoints, not the auth gate (which has
+        # its own tests in test_auth_api.py).
+        app.dependency_overrides[get_current_user] = lambda: User(username="tester")
         return TestClient(app)
 
     yield _make
@@ -691,6 +697,37 @@ def test_given_the_source_is_not_a_recipe_when_posting_then_returns_a_portuguese
 
     listed = client.get("/api/recipes").json()
     assert listed == []
+
+
+def test_given_a_persisted_recipe_when_updated_with_an_oversized_field_then_it_is_rejected(
+    client: TestClient,
+) -> None:
+    """Given a recipe was created, when PATCHed with a megabytes-long
+    description, then the request is rejected by the field's length cap —
+    without the cap this would write unbounded data to the database on every
+    call and could fill the disk."""
+    created = client.post("/api/recipes", json={"url": "https://example.com/receita"}).json()
+
+    response = client.patch(f"/api/recipes/{created['id']}", json={"description": "A" * 1_000_000})
+
+    assert response.status_code == 422
+    unchanged = client.get(f"/api/recipes/{created['id']}").json()
+    assert unchanged["description"] != "A" * 1_000_000
+
+
+def test_given_a_persisted_recipe_when_updated_with_a_dangerous_image_url_then_it_is_rejected(
+    client: TestClient,
+) -> None:
+    """Given a recipe was created, when PATCHed with a javascript: image_url,
+    then the request is rejected — only http(s) links are accepted, so a
+    stored value can never become a script when later rendered."""
+    created = client.post("/api/recipes", json={"url": "https://example.com/receita"}).json()
+
+    response = client.patch(
+        f"/api/recipes/{created['id']}", json={"image_url": "javascript:alert(1)"}
+    )
+
+    assert response.status_code == 422
 
 
 def test_given_a_persisted_recipe_when_updated_with_empty_ingredients_then_returns_a_validation_error(

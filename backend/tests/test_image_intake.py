@@ -13,6 +13,7 @@ import io
 import pytest
 from PIL import Image
 
+from app.services import image_intake
 from app.services.image_intake import (
     MAX_BYTES_PER_IMAGE,
     MAX_IMAGES,
@@ -34,6 +35,21 @@ def _encoded(width: int, height: int, image_format: str = "JPEG", mode: str = "R
 
 def _size_of(image_bytes: bytes) -> tuple[int, int]:
     return Image.open(io.BytesIO(image_bytes)).size
+
+
+def test_given_an_image_claiming_bomb_sized_dimensions_when_prepared_then_it_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Given an image whose pixel count is over the decode cap — the shape of a
+    decompression bomb, which is small on disk but explodes in memory — when
+    prepared, then it is refused with a handled error rather than being decoded
+    (and never as an unhandled 500). The cap is lowered here so the test needn't
+    build a real 900-megapixel file.
+    """
+    monkeypatch.setattr(image_intake, "_MAX_TOTAL_PIXELS", 100)
+
+    with pytest.raises(UnsupportedImageTypeError):
+        prepare_images([("image/png", _encoded(200, 200, image_format="PNG"))])
 
 
 def test_given_a_jpeg_photo_when_prepared_then_it_comes_back_as_decodable_jpeg_bytes() -> None:

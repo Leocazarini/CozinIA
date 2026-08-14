@@ -48,6 +48,11 @@ logger = logging.getLogger(__name__)
 # fixed opportunistically here.
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Cap how long a translation may hold a worker. Without it the OpenAI SDK's
+# 600-second default applies, which — chained after extraction's own call —
+# could pin one worker for twenty minutes on a single request.
+_AI_REQUEST_TIMEOUT_SECONDS = 120.0
+
 # langdetect picks a random seed per process unless told not to — fixing it
 # makes detect() deterministic, which matters for tests and for not flapping
 # between "translate" and "don't" on borderline text.
@@ -175,6 +180,7 @@ async def translate_recipe(
                 {"role": "user", "content": extraction.model_dump_json()},
             ],
             response_format=RecipeExtraction,
+            timeout=_AI_REQUEST_TIMEOUT_SECONDS,
         )
     except (LengthFinishReasonError, ContentFilterFinishReasonError) as error:
         raise MalformedTranslationResponseError(f"AI response was not usable: {error}") from error

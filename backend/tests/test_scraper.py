@@ -55,6 +55,46 @@ async def test_given_a_reachable_recipe_page_when_extracting_then_returns_main_c
     assert "Você também pode gostar" not in text
 
 
+async def test_given_a_url_that_resolves_to_a_private_address_when_fetching_then_it_is_refused() -> (
+    None
+):
+    """Given a URL pointing at loopback / a private / a link-local address,
+    when fetching, then it is refused before any request is made — the SSRF
+    guard, so a pasted internal URL can't reach the database, another service,
+    or a cloud metadata endpoint."""
+    seen_request = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_request
+        seen_request = True
+        return httpx.Response(200, text="<html></html>")
+
+    for url in (
+        "http://127.0.0.1:8000/health",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://10.0.0.5/x",
+        "http://[::1]/x",
+    ):
+        with pytest.raises(UnreachableUrlError):
+            await fetch_and_extract_text(url, transport=httpx.MockTransport(handler))
+
+    assert seen_request is False
+
+
+async def test_given_a_public_url_that_redirects_to_a_private_address_when_fetching_then_it_is_refused() -> (
+    None
+):
+    """Given a public URL that 302s to an internal address, when fetching, then
+    the redirect target is re-validated and refused — closing the bypass where
+    a redirect would otherwise smuggle the fetch to localhost or metadata."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"Location": "http://169.254.169.254/latest/meta-data/"})
+
+    with pytest.raises(UnreachableUrlError):
+        await fetch_and_extract_text(RECIPE_URL, transport=httpx.MockTransport(handler))
+
+
 async def test_given_the_url_returns_an_error_status_when_fetching_then_raises_unreachable_url_error() -> (
     None
 ):
