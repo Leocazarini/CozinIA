@@ -86,6 +86,37 @@
   --glaze: rgb(255 255 255 / 0.05);
 }
 
+/*
+ * What separates the installed app from a page in a browser, on a phone:
+ *
+ * `overscroll-behavior` stops the rubber-band at the ends of a scroll — the
+ * bounce that reveals a strip of browser underneath, and the accidental
+ * pull-to-refresh that wipes a half-scrolled recipe mid-cooking.
+ *
+ * The tap highlight is a grey rectangle Android flashes over whatever was
+ * touched, drawn on top of the tile press animation this app already has.
+ */
+html {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Kills the ~300ms wait for a possible double-tap (and the double-tap zoom
+ * with it) on things meant to be tapped once. Deliberately not
+ * `user-scalable=no` on the viewport: pinching a recipe open while cooking
+ * has to keep working.
+ */
+a,
+button,
+label,
+summary,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 body {
   background-color: var(--color-paper);
   color: var(--color-ink);

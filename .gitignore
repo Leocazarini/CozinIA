@@ -6,6 +6,10 @@
 .env.*
 !.env.example
 
+# TLS certificates and their private keys, generated per machine by
+# scripts/generate-dev-certs.sh
+/certs
+
 # Python
 __pycache__/
 *.py[cod]

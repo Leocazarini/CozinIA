@@ -16,7 +16,14 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col text-ink">
-      <header className="sticky top-0 z-10 border-b-2 border-ink bg-paper/90 backdrop-blur">
+      {/* Installed, the app owns the whole screen (viewport-fit=cover in
+          index.html), so the status bar sits *over* the top of the header
+          instead of above it. The inset pushes the wordmark clear of it and
+          is 0 everywhere else, including in the browser. */}
+      <header
+        className="sticky top-0 z-10 border-b-2 border-ink bg-paper/90 backdrop-blur"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <div className="relative mx-auto flex max-w-md items-center px-5 py-3.5">
           {/* "IA" is set as its own accent tile: the intelligence is the
               product, so the wordmark says so out loud. The tile is tucked

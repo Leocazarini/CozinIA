@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createRecipeFromImages } from '../../src/api/recipes'
+import { createRecipeFromImages, fetchRecipes } from '../../src/api/recipes'
 import { buildRecipe } from '../factories/recipe'
 
 /**
@@ -19,6 +19,23 @@ function sentForm(stub: ReturnType<typeof stubFetch>): FormData {
 }
 
 afterEach(() => vi.unstubAllGlobals())
+
+describe('where the API lives', () => {
+  it('given no API URL is configured, when a recipe list is requested, then it is asked of the same origin that served the app', async () => {
+    // The whole mobile app rests on this: the page, the service worker and
+    // the API share one origin, so an https page never calls plain http
+    // (blocked as mixed content) and the same build works unchanged behind
+    // the reverse proxy on the LAN and on the VPS.
+    const stub = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }))
+    vi.stubGlobal('fetch', stub)
+
+    await fetchRecipes()
+
+    const requested = new URL(stub.mock.calls[0][0] as string, window.location.href)
+    expect(requested.origin).toBe(window.location.origin)
+    expect(requested.pathname).toBe('/api/recipes')
+  })
+})
 
 describe('createRecipeFromImages', () => {
   it('given the pages of one recipe, when sending them, then they are attached in the order given', async () => {

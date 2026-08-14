@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the app draw under the notch and the gesture
+         bar — without it `env(safe-area-inset-*)` is always 0 and the layout
+         stops short of the screen edges, which is what makes a web page look
+         like a web page. Zoom is left alone on purpose: the double-tap zoom
+         is dealt with by `touch-action`, so pinching a recipe still works. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- iOS reads neither the manifest's `display` nor its icons: standalone
+         mode and the home-screen icon come from these instead. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="CozinIA" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <!-- Matches the header in each theme, so the mobile status bar reads as
          part of the tiled wall instead of a separate coloured band. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2efe4" />
