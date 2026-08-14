@@ -1,3 +1,9 @@
+# Never copy secrets into the build context. Vite inlines any VITE_* var it
+# finds in a .env into the client bundle, so a stray .env here would ship to
+# every browser.
+.env
+.env.*
+
 node_modules
 dist
 .vite

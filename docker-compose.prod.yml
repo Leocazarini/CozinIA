@@ -1,0 +1,97 @@
+# Production topology for the VPS. Standalone (do NOT combine with the base
+# docker-compose.yml): use it on its own so none of the dev conveniences leak
+# in — no `--reload`, no bind-mounted source, no Vite dev server, and no host
+# port on Postgres or the backend. Only nginx (`web`) is reachable from outside
+# the Compose network; everything else talks over the internal network.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Requires a .env alongside this file with real values (see .env.example),
+# including JWT_SECRET and, behind Cloudflare, WEB_SERVER_NAME set to the
+# domain and a real certificate mounted over ./certs (a Cloudflare Origin
+# Certificate when Cloudflare proxies the VPS, Let's Encrypt otherwise).
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no .env}
+    volumes:
+      - cozinia_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?} -d ${POSTGRES_DB:?}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No `ports`: Postgres is reachable only as `db:5432` inside the Compose
+    # network. It is never published to the host, let alone the internet.
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Defina OPENROUTER_API_KEY no .env}
+      AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
+      AI_VISION_MODEL: ${AI_VISION_MODEL:-anthropic/claude-sonnet-5}
+      AI_VIDEO_MODEL: ${AI_VIDEO_MODEL:-anthropic/claude-sonnet-5}
+      AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
+      AI_TRANSLATION_MODEL: ${AI_TRANSLATION_MODEL:-anthropic/claude-sonnet-5}
+      VIDEO_COOKIES_FILE: ${VIDEO_COOKIES_FILE:-}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env — use um valor aleatório longo}
+      # The origin the browser loads the app from, so CORS allows exactly it
+      # and nothing else. Same value as WEB_SERVER_NAME, as an https URL.
+      ALLOWED_ORIGIN: https://${WEB_SERVER_NAME:?Defina WEB_SERVER_NAME no .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    # No bind mounts and no `--reload`: the image is the artifact. Migrations
+    # run once at boot, then the server starts.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    # No `ports`: only nginx reaches the backend, as `backend:8000` over the
+    # internal network. The API is never exposed directly.
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build:
+      context: ./frontend
+      target: web
+    environment:
+      WEB_SERVER_NAME: ${WEB_SERVER_NAME:?Defina WEB_SERVER_NAME no .env}
+      TLS_CERT_FILE: /etc/nginx/certs/cozinia.pem
+      TLS_KEY_FILE: /etc/nginx/certs/cozinia-key.pem
+    volumes:
+      # Mount the real certificate here. Behind Cloudflare (proxied), this is a
+      # Cloudflare Origin Certificate; otherwise a Let's Encrypt certificate.
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "${WEB_HTTP_PORT:-80}:80"
+      - "${WEB_HTTPS_PORT:-443}:443"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  cozinia_db_data:

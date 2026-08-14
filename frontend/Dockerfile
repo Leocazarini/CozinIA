@@ -41,5 +41,9 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # The nginx entrypoint runs envsubst over everything in this directory before
 # starting, which is how WEB_SERVER_NAME and the certificate paths get in.
 COPY nginx/cozinia.conf.template /etc/nginx/templates/default.conf.template
+# Security headers live in a snippet the server config `include`s. Kept out of
+# the templates dir on purpose: it has no variables to substitute, and it is
+# not a standalone server block.
+COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 EXPOSE 80 443

@@ -13,8 +13,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Bound to loopback, never 0.0.0.0: the backend reaches Postgres over the
+    # Compose network as `db:5432`; this mapping exists only so a developer can
+    # inspect the database from the host. Publishing it on all interfaces would
+    # put Postgres on the LAN behind a single password. Production
+    # (docker-compose.prod.yml) drops the host mapping entirely.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
   backend:
     build:
@@ -28,6 +33,10 @@ services:
       AI_AUDIO_MODEL: ${AI_AUDIO_MODEL:-openai/whisper-1}
       AI_TRANSLATION_MODEL: ${AI_TRANSLATION_MODEL:-anthropic/claude-sonnet-5}
       VIDEO_COOKIES_FILE: ${VIDEO_COOKIES_FILE:-}
+      # Signs the login tokens. No default on purpose — the app refuses to
+      # start without it (see app/core/config.py), so a deploy can never fall
+      # back to a predictable key that would let anyone forge a session.
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env — use um valor aleatório longo}
     volumes:
       - ./backend/app:/app/app
     depends_on:
@@ -39,8 +48,11 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+    # Loopback only — nginx (`web`) proxies /api over the Compose network, so
+    # the host never needs to reach the backend on all interfaces. This mapping
+    # is a dev convenience; production drops it.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
 
   frontend:
@@ -86,9 +98,15 @@ services:
   # Unlike `frontend`, this has no hot-reload: it serves a build baked into
   # the image, so changing the frontend means `docker compose build web`.
   #
-  # Deploying to the VPS reuses this service as-is: swap the certificate for
-  # the Let's Encrypt one and set WEB_SERVER_NAME to the real domain.
+  # Behind a `preview` profile so a plain `docker compose up` runs the dev
+  # stack (db + backend + frontend on 5173) and does NOT also start this
+  # production server. To preview the built app locally over https:
+  #   docker compose --profile preview up web
+  # The real deploy uses docker-compose.prod.yml, which sets WEB_SERVER_NAME to
+  # the domain and mounts a real certificate (a Cloudflare Origin Certificate
+  # when Cloudflare proxies the VPS, or Let's Encrypt when it does not).
   web:
+    profiles: ["preview"]
     build:
       context: ./frontend
       target: web
@@ -120,11 +138,15 @@ services:
   # the full backend suite against the real test database, reports the
   # result, and exits — it never stays up.
   tests-backend:
+    profiles: ["test"]
     build:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
       TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/cozinia_test
+      # Any non-empty value: the suite never verifies a token against a real
+      # secret (see tests/conftest.py), it only needs Settings to construct.
+      JWT_SECRET: ${JWT_SECRET:-test-secret-not-used-in-production}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-anthropic/claude-sonnet-5}
       AI_VISION_MODEL: ${AI_VISION_MODEL:-anthropic/claude-sonnet-5}
@@ -142,6 +164,7 @@ services:
   # Same idea as tests-backend, but for the frontend suite (Vitest) — waits
   # for the frontend dev server to be healthy, runs it once, reports and exits.
   tests-frontend:
+    profiles: ["test"]
     build:
       context: ./frontend
       target: dev
