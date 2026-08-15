@@ -65,33 +65,58 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # Behind Traefik: nginx serves plain HTTP on 80 inside the Docker network,
+  # never publishing a host port. Traefik owns 80/443 and terminates TLS (with
+  # the Cloudflare Origin Certificate), then routes the domain here. The
+  # behind-proxy template (mounted below) is the http-only variant of the
+  # server config; it replaces the image's default TLS template.
   web:
     build:
       context: ./frontend
       target: web
     environment:
       WEB_SERVER_NAME: ${WEB_SERVER_NAME:?Defina WEB_SERVER_NAME no .env}
-      TLS_CERT_FILE: /etc/nginx/certs/cozinia.pem
-      TLS_KEY_FILE: /etc/nginx/certs/cozinia-key.pem
     volumes:
-      # Mount the real certificate here. Behind Cloudflare (proxied), this is a
-      # Cloudflare Origin Certificate; otherwise a Let's Encrypt certificate.
-      - ./certs:/etc/nginx/certs:ro
+      - ./frontend/nginx/behind-proxy.conf.template:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fk", "https://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 5s
-    ports:
-      - "${WEB_HTTP_PORT:-80}:80"
-      - "${WEB_HTTPS_PORT:-443}:443"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    networks:
+      # `default` to reach backend/db; `proxy` so Traefik can discover it.
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # Which network Traefik should use to reach this container.
+      - "traefik.docker.network=proxy"
+      # HTTPS router: the domain, on Traefik's TLS entrypoint. `tls=true` serves
+      # the default certificate configured in Traefik (the Cloudflare Origin
+      # cert — see the dynamic-config snippet in the deploy notes).
+      - "traefik.http.routers.cozinia.rule=Host(`${WEB_SERVER_NAME}`)"
+      - "traefik.http.routers.cozinia.entrypoints=websecure"
+      - "traefik.http.routers.cozinia.tls=true"
+      # nginx listens on 80 inside the network; Traefik connects there.
+      - "traefik.http.services.cozinia.loadbalancer.server.port=80"
+      # http -> https redirect for anyone hitting port 80 directly.
+      - "traefik.http.routers.cozinia-http.rule=Host(`${WEB_SERVER_NAME}`)"
+      - "traefik.http.routers.cozinia-http.entrypoints=web"
+      - "traefik.http.routers.cozinia-http.middlewares=cozinia-https"
+      - "traefik.http.middlewares.cozinia-https.redirectscheme.scheme=https"
+
+networks:
+  # The shared network Traefik already runs on. Create it once with
+  # `docker network create proxy` if it doesn't exist yet.
+  proxy:
+    external: true
 
 volumes:
   cozinia_db_data:

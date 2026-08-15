@@ -1,0 +1,95 @@
+# CozinIA served BEHIND a TLS-terminating reverse proxy (Traefik).
+#
+# Traefik owns ports 80/443 and the certificate; this nginx speaks plain HTTP
+# on port 80 inside the Docker network only. There is no http->https redirect
+# here — Traefik (and Cloudflare in front of it) handle that. Used by mounting
+# it over the image's default template in docker-compose.prod.yml.
+
+# Flood protection under the backend's own per-user limiter. Behind Traefik +
+# Cloudflare the address seen here is a proxy, so keep these coarse and let the
+# backend do the precise per-user limiting (it keys on CF-Connecting-IP, passed
+# through below).
+limit_req_zone $binary_remote_addr zone=api_rl:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=api_conn:10m;
+
+server_tokens off;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${WEB_SERVER_NAME};
+
+    # Security headers (re-included in every location that sets its own
+    # add_header, since nginx drops inherited ones there). HSTS is served here
+    # and reaches the browser over the HTTPS leg Traefik terminates, so it is
+    # still honored.
+    include /etc/nginx/snippets/security-headers.conf;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # 8 photos of up to 10MB each (MAX_IMAGES × MAX_BYTES_PER_IMAGE in
+    # backend/app/services/image_intake.py), plus multipart overhead.
+    client_max_body_size 88m;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml application/manifest+json;
+    gzip_min_length 1024;
+
+    # Docker's embedded DNS, consulted at request time so a restarted backend
+    # container's new address is picked up without reloading nginx.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $backend http://backend:8000;
+
+    location /api/ {
+        limit_req zone=api_rl burst=40 nodelay;
+        limit_conn api_conn 20;
+
+        proxy_pass $backend$request_uri;
+        # Fixed Host, not the client-supplied one: the backend pins its trusted
+        # hosts and never needs the incoming Host.
+        proxy_set_header Host $server_name;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # The browser reached us over https (Traefik terminated it); tell the
+        # backend so, regardless of this internal hop being http.
+        proxy_set_header X-Forwarded-Proto https;
+        # Pass Cloudflare's real-client header through so the backend's rate
+        # limiter keys on the actual user, not the proxy.
+        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+
+        # The video door is the longest request in the app; nginx's 60s default
+        # would cut the response off mid-extraction.
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+    }
+
+    location = /health {
+        proxy_pass $backend$request_uri;
+        proxy_set_header Host $server_name;
+        access_log off;
+    }
+
+    location = /manifest.webmanifest {
+        types { }
+        default_type application/manifest+json;
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    location ~* ^/(index\.html|sw\.js|registerSW\.js)$ {
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
